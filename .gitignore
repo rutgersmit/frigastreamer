@@ -11,3 +11,7 @@ captures/
 *.p12
 keystore.b64
 dist/
+keystore.properties
+signing-secrets.env
+*.b64
+key.pem

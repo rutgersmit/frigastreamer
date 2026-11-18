@@ -1,71 +1,85 @@
 # FrigaStreamer
 
-Android-tabletapp die live camerastreams uit [Frigate NVR](https://frigate.video) (via de
-ingebouwde go2rtc-restream) fullscreen toont. Gebouwd als **permanente cameramonitor**:
-snel swipen tussen camera's en zelfstandig herstellen van netwerkstoringen, vastgelopen
-streams, Frigate-herstarts en standby. Betrouwbaarheid gaat vóór extra functionaliteit.
+> **Get it on Obtainium:** in [Obtainium](https://github.com/ImranR98/Obtainium), tap *Add App* and enter
+> `https://github.com/rutgersmit/frigastreamer`. Or download the APK from the
+> [latest release](https://github.com/rutgersmit/frigastreamer/releases/latest).
 
-- Eén camera tegelijk, fullscreen, swipen met wrap-around.
-- Automatische cameralijst uit `/api/go2rtc/streams` + `/api/config`, aangevuld met handmatige camera's.
-- Per camera een reconnect-state-machine met exponential backoff (1 → 30 s), frame-watchdog en offline-scherm.
-- Sliding window van maximaal 3 ExoPlayer-instanties; buren voorgeladen via de substream.
-- Geen Google Play Services, geen analytics/trackers, geen cloud: alleen tablet ↔ Frigate op het LAN.
-- Builds via GitHub Actions, installatie en updates via [Obtainium](https://github.com/ImranR98/Obtainium).
+Android tablet app that shows live camera streams from [Frigate NVR](https://frigate.video) (via its
+built-in go2rtc restream) fullscreen. Built as a **permanent camera monitor**: fast swiping between
+cameras and recovering on its own from network outages, frozen streams, Frigate restarts and standby.
+Reliability comes before extra features.
 
----
+- One camera at a time, fullscreen, swiping with wrap-around.
+- Automatic camera list from `/api/go2rtc/streams` + `/api/config`, supplemented with manual cameras.
+- A reconnect state machine per camera with exponential backoff (1 → 30 s), frame watchdog and offline screen.
+- Sliding window of at most 3 ExoPlayer instances; neighbours preloaded via the substream.
+- No Google Play Services, no analytics/trackers, no cloud: only tablet ↔ Frigate on the LAN.
+- Builds via GitHub Actions, installs and updates via Obtainium.
+- UI in English and Dutch (follows the device language).
 
-## Inhoud
+> **Disclaimer:** FrigaStreamer is an independent project. It is not affiliated with, endorsed by or
+> supported by Frigate or its authors.
 
-1. [Projectstructuur](#projectstructuur)
-2. [Technologieën en versies](#technologieën-en-versies)
-3. [Eenmalige setup (keystore + GitHub Secrets)](#eenmalige-setup-keystore--github-secrets)
-4. [GitHub Actions en een release maken](#github-actions-en-een-release-maken)
-5. [Installatie en updates via Obtainium](#installatie-en-updates-via-obtainium)
-6. [Installatie via ADB](#installatie-via-adb)
-7. [Optioneel: lokaal bouwen](#optioneel-lokaal-bouwen)
-8. [Configuratie van Frigate en go2rtc](#configuratie-van-frigate-en-go2rtc)
-9. [Koppeling go2rtc-streams ↔ camera's](#koppeling-go2rtc-streams--cameras)
-10. [Ondersteunde codecs, H.265 en G.711](#ondersteunde-codecs-h265-en-g711)
-11. [Reconnect-strategie, watchdog en offline-status](#reconnect-strategie-watchdog-en-offline-status)
-12. [Home-app-modus (automatisch starten na reboot)](#home-app-modus-automatisch-starten-na-reboot)
-13. [Instellingen](#instellingen)
-14. [Logs uitlezen via ADB](#logs-uitlezen-via-adb)
-15. [Testomgeving (`testenv/`) en storingen simuleren](#testomgeving-testenv-en-storingen-simuleren)
-16. [Tests](#tests)
-17. [Bekende beperkingen](#bekende-beperkingen)
-18. [Troubleshooting](#troubleshooting)
+<!-- Screenshots: add generic test-pattern screenshots here (never real camera footage). -->
 
 ---
 
-## Projectstructuur
+## Contents
+
+1. [Project structure](#project-structure)
+2. [Technologies and versions](#technologies-and-versions)
+3. [First launch](#first-launch)
+4. [Installing and updating via Obtainium](#installing-and-updating-via-obtainium)
+5. [Installing via ADB](#installing-via-adb)
+6. [GitHub Actions and creating a release](#github-actions-and-creating-a-release)
+7. [One-time setup: keystore and GitHub Secrets (also for forks)](#one-time-setup-keystore-and-github-secrets-also-for-forks)
+8. [Optional: building locally](#optional-building-locally)
+9. [Frigate and go2rtc configuration](#frigate-and-go2rtc-configuration)
+10. [Mapping go2rtc streams to cameras](#mapping-go2rtc-streams-to-cameras)
+11. [Supported codecs, H.265 and G.711](#supported-codecs-h265-and-g711)
+12. [Reconnect strategy, watchdog and offline status](#reconnect-strategy-watchdog-and-offline-status)
+13. [Home app mode (auto-start after reboot)](#home-app-mode-auto-start-after-reboot)
+14. [Settings](#settings)
+15. [Reading logs via ADB](#reading-logs-via-adb)
+16. [Test environment (`testenv/`) and simulating failures](#test-environment-testenv-and-simulating-failures)
+17. [Tests](#tests)
+18. [Known limitations](#known-limitations)
+19. [Troubleshooting](#troubleshooting)
+
+---
+
+## Project structure
 
 ```
-.github/workflows/build.yml   CI: unit tests, (ondertekende) build, artifact, release bij tag v*
+.github/workflows/build.yml   CI: unit tests, (signed) build, artifact, release on tag v*
 app/src/main/java/io/github/rutgersmit/frigastreamer/
-  data/        Frigate-API-client (login/JWT), JSON-parsing, CameraRepository (cache)
-  domain/      Modellen en pure logica: backoff, spelervenster, foutclassificatie,
-               stream↔camera-koppeling, cameralijst samenstellen
-  player/      StreamPlayer-abstractie + ExoStreamPlayer (Media3 RTSP over TCP)
-  stream/      StreamController (state-machine per camera) en StreamManager (venster)
-  network/     ConnectivityManager-netwerkdetectie, Frigate/RTSP-bereikbaarheid
-  settings/    AppSettings + DataStore-opslag
-  service/     Home-app-helper
-  ui/          Compose: live-scherm, camerapagina, debug-overlay, instellingen
-  util/        Logging (met redactie van credentials), klok-abstractie
-app/src/test/  Unit tests (fakes + virtuele tijd) en opt-in integratietest tegen testenv/
-testenv/       Docker-testomgeving: MediaMTX + ffmpeg-testpatronen + Frigate-API-mock
+  data/        Frigate API client (login/JWT), JSON parsing, CameraRepository (cache)
+  domain/      Models and pure logic: backoff, player window, error classification,
+               stream↔camera mapping, building the camera list
+  player/      StreamPlayer abstraction + ExoStreamPlayer (Media3 RTSP over TCP)
+  stream/      StreamController (state machine per camera) and StreamManager (window)
+  network/     ConnectivityManager network detection, Frigate/RTSP reachability
+  settings/    AppSettings + DataStore persistence
+  service/     Home app helper
+  ui/          Compose: live screen, camera page, debug overlay, settings
+  util/        Logging (with credential redaction), clock abstraction
+app/src/main/res/values/       English strings (default)
+app/src/main/res/values-nl/    Dutch translation
+app/src/test/  Unit tests (fakes + virtual time) and opt-in integration test against testenv/
+testenv/       Docker test environment: MediaMTX + ffmpeg test patterns + Frigate API mock
 scripts/       install.sh / install.ps1 (ADB), set-signing-secrets.sh
-TESTING.md     Checklist voor handmatige verificatie op de tablet
+TESTING.md     Checklist for manual verification on the tablet
+CLAUDE.md      Working rules for AI-assisted development in this repository
 ```
 
-## Technologieën en versies
+## Technologies and versions
 
-| Onderdeel | Versie |
+| Component | Version |
 |---|---|
-| Kotlin | 2.4.21 (Android Gradle Plugin met ingebouwde Kotlin-ondersteuning) |
+| Kotlin | 2.4.21 (Android Gradle Plugin with built-in Kotlin support) |
 | Android Gradle Plugin | 9.5.1 |
 | Gradle (wrapper) | 9.9.1 |
-| JDK voor de build | 17 of nieuwer (CI: Temurin 21) |
+| JDK for the build | 17 or newer (CI: Temurin 21) |
 | compileSdk / targetSdk | 37 (Android 17) |
 | minSdk | 26 (Android 8.0) |
 | Jetpack Compose BOM | 2026.09.00 |
@@ -74,93 +88,104 @@ TESTING.md     Checklist voor handmatige verificatie op de tablet
 | Kotlin Coroutines | 1.11.0 |
 | kotlinx.serialization-json | 1.13.0 |
 
-Alle versies staan in [`gradle/libs.versions.toml`](gradle/libs.versions.toml). Er zijn geen
-andere runtime-dependencies (geen OkHttp/Retrofit: de API-client gebruikt `HttpURLConnection`).
+All versions are in [`gradle/libs.versions.toml`](gradle/libs.versions.toml). There are no other runtime
+dependencies (no OkHttp/Retrofit: the API client uses `HttpURLConnection`).
 
-## Eenmalige setup (keystore + GitHub Secrets)
+## First launch
 
-Android accepteert een update alleen als die met **dezelfde sleutel** is ondertekend als de
-geïnstalleerde versie. Daarom ondertekent CI elke release met één vaste keystore uit GitHub Secrets.
+1. Install the app (see [Obtainium](#installing-and-updating-via-obtainium) or [ADB](#installing-via-adb)).
+2. With no Frigate server configured, the app shows an empty screen with a **Settings** button
+   (or long-press anywhere).
+3. Under **Frigate**, enter the **IP address** of your Frigate host (e.g. `192.168.1.10`) and tap
+   **Save and fetch camera list**. The *Camera list* section then shows whether the API is reachable,
+   how many go2rtc streams and cameras were found, and which cameras have no stream.
 
-### 1. Keystore aanmaken
+What Frigate needs:
 
-Heb je al een keystore gekregen (`frigastreamer-release.p12` + `signing-secrets.env`), sla dan
-deze stap over. Anders, op een machine met een JDK:
+- **go2rtc restreaming** for every camera you want to see (a go2rtc stream with the camera's name,
+  optionally a `<camera>_sub` substream). See [Frigate and go2rtc configuration](#frigate-and-go2rtc-configuration).
+- Port **5000** (internal API) or **8971** (authenticated API) and port **8554** (RTSP) reachable from
+  the tablet.
+
+## Installing and updating via Obtainium
+
+1. Install Obtainium on the tablet: APK from the
+   [Obtainium releases page](https://github.com/ImranR98/Obtainium/releases) or via F-Droid.
+2. Obtainium → *Add App* → enter `https://github.com/rutgersmit/frigastreamer` → *Add*.
+   The repository is public, so **no token is needed**. Optionally, add a GitHub Personal Access Token
+   under Obtainium *Settings → Source-specific → GitHub* to raise the GitHub API rate limit if you
+   track many apps.
+3. On the first install, allow *Install unknown apps* for Obtainium (Android asks automatically;
+   otherwise: *Settings → Apps → Obtainium → Install unknown apps*).
+4. **Updates:** Obtainium periodically checks for new GitHub Releases (configurable under
+   *Settings → Background update checking*) and shows a notification. Tap *Update* to install.
+   Because every release is signed with the same key and the `versionCode` always increases,
+   the update installs over the existing installation and your settings are kept.
+   Each release has exactly one APK, so no APK filter is needed.
+
+## Installing via ADB
+
+Fallback, and handy for logs. You only need
+[Android platform-tools](https://developer.android.com/tools/releases/platform-tools) (`adb`) and the
+[GitHub CLI](https://cli.github.com) (`gh`, logged in with `gh auth login`): no SDK or compiler.
 
 ```bash
-keytool -genkeypair -v -storetype PKCS12 -keystore frigastreamer-release.p12 \
-  -alias frigastreamer -keyalg RSA -keysize 4096 -validity 10950 \
-  -dname "CN=FrigaStreamer, O=Private"
-```
-
-Zonder JDK kan het ook met OpenSSL (PKCS12 wordt door Android geaccepteerd):
-
-```bash
-openssl req -x509 -newkey rsa:4096 -nodes -days 10950 -subj "/CN=FrigaStreamer/O=Private" -keyout key.pem -out cert.pem
+./scripts/install.sh            # latest release, on all connected devices
 ```
 
 ```bash
-openssl pkcs12 -export -inkey key.pem -in cert.pem -name frigastreamer -out frigastreamer-release.p12
+./scripts/install.sh v0.2.0     # specific release
 ```
 
-(Bij OpenSSL zijn store- en key-wachtwoord gelijk: het export-wachtwoord. Verwijder daarna `key.pem`.)
+Windows:
 
-### 2. GitHub Secrets zetten
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install.ps1
+```
 
-| Secret | Inhoud |
-|---|---|
-| `SIGNING_KEYSTORE_BASE64` | de keystore, base64-gecodeerd (één regel) |
-| `SIGNING_STORE_PASSWORD` | wachtwoord van de keystore |
-| `SIGNING_KEY_ALIAS` | alias, bv. `frigastreamer` |
-| `SIGNING_KEY_PASSWORD` | wachtwoord van de sleutel |
+The scripts check `gh` and `adb`, download the APK with `gh release download`, install it with
+`adb install -r` on all connected devices, launch the app and print clear error messages
+(e.g. on `INSTALL_FAILED_UPDATE_INCOMPATIBLE`: different key → first `adb uninstall io.github.rutgersmit.frigastreamer`).
+Outside a checkout they default to `rutgersmit/frigastreamer`; set `REPO=owner/repo` (or `-Repo`) for a fork.
 
-Met de GitHub CLI (vanuit een checkout van deze repository):
+**USB:** on the tablet, enable *Developer options → USB debugging* (unlock developer options by tapping
+*Build number* 7 times) and confirm the prompt on the screen.
+
+**Wireless debugging (Android 11+):** *Developer options → Wireless debugging* on →
+*Pair device with pairing code*. Then on your computer:
 
 ```bash
-./scripts/set-signing-secrets.sh frigastreamer-release.p12 signing-secrets.env
+adb pair 192.168.1.20:37123      # IP:port and code from the pairing dialog
 ```
 
-waarbij `signing-secrets.env` er zo uitziet:
-
-```
-SIGNING_STORE_PASSWORD=...
-SIGNING_KEY_ALIAS=frigastreamer
-SIGNING_KEY_PASSWORD=...
+```bash
+adb connect 192.168.1.20:41234   # IP:port from the main 'Wireless debugging' screen
 ```
 
-Via de website kan ook: *Settings → Secrets and variables → Actions → New repository secret*.
-De base64-waarde maak je met `base64 -w0 frigastreamer-release.p12` (Linux),
-`base64 -i frigastreamer-release.p12` (macOS) of in PowerShell
-`[Convert]::ToBase64String([IO.File]::ReadAllBytes("frigastreamer-release.p12"))`.
+## GitHub Actions and creating a release
 
-### 3. Back-up!
+Workflow: [`.github/workflows/build.yml`](.github/workflows/build.yml). Triggers: push to `main`
+(and `claude/**` development branches), pull requests, tags `v*` and manual (`workflow_dispatch`).
 
-> **Bewaar de keystore én de wachtwoorden op een veilige plek** (bv. in je wachtwoordmanager).
-> Raak je ze kwijt, dan kun je geen updates meer over de bestaande installatie heen zetten:
-> je moet de app dan verwijderen (inclusief alle instellingen) en opnieuw installeren.
-> Commit de keystore nooit; `.gitignore` sluit `*.p12`, `*.jks` en `*.keystore` uit.
+Steps: checkout → JDK 21 (Temurin) → Gradle cache → determine version → `./gradlew testDebugUnitTest`
+(summary in the job summary, reports as artifact `test-results`) → check signing secrets →
+`./gradlew assembleRelease` (signed) or `assembleDebug` → verify signature with `apksigner` →
+APK as workflow artifact → on a tag: a separate `release` job creates the GitHub Release with exactly one APK.
 
-## GitHub Actions en een release maken
+- **Security:** the workflow runs with `contents: read`; only the `release` job gets `contents: write`.
+  Signing secrets are only used for pushes and manual runs in `rutgersmit/frigastreamer`, never for pull
+  requests (including PRs from forks). `pull_request_target` is not used.
+- **No secrets?** On push/PR the tests run and a debug APK is built (with a warning). On a **tag** the
+  workflow fails with a clear error: a release is never silently signed with a debug key. Gradle itself
+  also refuses `assembleRelease` without signing variables.
+- **Versions:** `versionCode` = `GITHUB_RUN_NUMBER` (every CI build higher than the previous one; 1 locally),
+  `versionName` = the tag without `v` (e.g. `0.3.0`), otherwise `0.0.0-dev.<run_number>`.
+  The version is shown at the top of the settings screen and in the debug overlay.
+- **Release asset:** exactly one file, `FrigaStreamer-<versionName>.apk`, with automatically generated
+  release notes (`--generate-notes`). If a tag workflow is re-run, the asset is replaced (`--clobber`),
+  so a release never has two APKs.
 
-Workflow: [`.github/workflows/build.yml`](.github/workflows/build.yml). Triggers: push naar `main`
-(en `claude/**`-ontwikkelbranches), pull requests, tags `v*` en handmatig (`workflow_dispatch`).
-
-Stappen: checkout → JDK 21 (Temurin) → Gradle-cache → versie bepalen → `./gradlew testDebugUnitTest`
-(samenvatting in de job summary, rapporten als artifact `test-results`) → signing-secrets controleren →
-`./gradlew assembleRelease` (ondertekend) → handtekening controleren met `apksigner` →
-APK als workflow-artifact → bij een tag: GitHub Release met precies één APK.
-
-- **Geen secrets?** Bij push/PR draaien de tests en wordt een debug-APK gebouwd (met een waarschuwing).
-  Bij een **tag** faalt de workflow met een duidelijke foutmelding: een release wordt nooit stilletjes
-  met een debug-sleutel ondertekend. Ook Gradle zelf weigert `assembleRelease` zonder signing-variabelen.
-- **Versies:** `versionCode` = `GITHUB_RUN_NUMBER` (elke CI-build hoger dan de vorige; lokaal 1),
-  `versionName` = de tag zonder `v` (bv. `0.3.0`), anders `0.0.0-dev.<run_number>`.
-  De versie staat bovenaan het instellingenscherm en in de debug-overlay.
-- **Release-asset:** precies één bestand, `frigate-viewer-<versionName>.apk`, met automatisch
-  gegenereerde releasenotes (`--generate-notes`). Wordt een tag-workflow opnieuw gedraaid, dan wordt
-  de asset vervangen (`--clobber`), zodat er nooit twee APK's aan een release hangen.
-
-**Een release maken:**
+**Creating a release:**
 
 ```bash
 git tag v0.1.0
@@ -170,266 +195,279 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Of op GitHub: *Releases → Draft a new release → Choose a tag → `v0.1.0` (create new tag)* — de
-workflow hangt de APK daarna aan die release.
+Or on GitHub: *Releases → Draft a new release → Choose a tag → `v0.1.0` (create new tag)*; the workflow
+then attaches the APK to that release.
 
-R8/minify staat uit (`isMinifyEnabled = false`): de winst is klein voor een sideloaded LAN-app en het
-risico op subtiele problemen met Media3 is het niet waard.
+R8/minify is off (`isMinifyEnabled = false`): the gain is small for a sideloaded LAN app and not worth the
+risk of subtle problems with Media3.
 
-## Installatie en updates via Obtainium
+## One-time setup: keystore and GitHub Secrets (also for forks)
 
-1. Installeer Obtainium op de tablet: APK van de
-   [Obtainium-releasepagina](https://github.com/ImranR98/Obtainium/releases) of via F-Droid.
-2. Maak op GitHub een **fine-grained Personal Access Token**: *Settings → Developer settings →
-   Personal access tokens → Fine-grained tokens → Generate new token*. Kies *Only select
-   repositories* → deze repository, en bij *Repository permissions* alleen **Contents: Read-only**
-   (Metadata: Read-only wordt automatisch toegevoegd). Kies een ruime vervaldatum.
-3. Obtainium → *Settings* → *Source-specific* → **GitHub** → vul het token in bij
-   *GitHub Personal Access Token* (nodig omdat de repository privé is).
-4. Obtainium → *Add App* → plak de repository-URL (`https://github.com/<eigenaar>/frigastreamer`) → *Add*.
-5. Sta bij de eerste installatie *Installeren uit onbekende bronnen* toe voor Obtainium
-   (Android vraagt dit automatisch; anders: *Instellingen → Apps → Obtainium → Onbekende apps installeren*).
-6. **Updates:** Obtainium controleert periodiek (instelbaar onder *Settings → Background update
-   checking*) op nieuwe GitHub Releases en toont een melding. Tik op *Update* om te installeren.
-   Omdat elke release met dezelfde sleutel is ondertekend en de `versionCode` steeds hoger is,
-   gaat de update over de bestaande installatie heen en blijven de instellingen behouden.
-   Er is per release maar één APK, dus er is geen APK-filter nodig.
+Android only accepts an update if it is signed with **the same key** as the installed version. That is
+why CI signs every release with one fixed keystore from GitHub Secrets. If you fork this repository and
+want your own releases, you need your own keystore and secrets (and your fork's name in the
+`github.repository` check in the workflow).
 
-## Installatie via ADB
+### 1. Create a keystore
 
-Fallback en handig voor logs. Je hebt alleen
-[Android platform-tools](https://developer.android.com/tools/releases/platform-tools) (`adb`) en de
-[GitHub CLI](https://cli.github.com) (`gh`, ingelogd met `gh auth login`) nodig — geen SDK of compiler.
+On a machine with a JDK:
 
 ```bash
-./scripts/install.sh            # nieuwste release, op alle verbonden apparaten
+keytool -genkeypair -v -storetype PKCS12 -keystore frigastreamer-release.p12 \
+  -alias frigastreamer -keyalg RSA -keysize 4096 -validity 10950 \
+  -dname "CN=FrigaStreamer, O=Private"
+```
+
+Without a local JDK, use Docker:
+
+```bash
+docker run --rm -it -v "$PWD":/out eclipse-temurin:21 keytool -genkeypair -v -storetype PKCS12 \
+  -keystore /out/frigastreamer-release.p12 -alias frigastreamer -keyalg RSA -keysize 4096 \
+  -validity 10950 -dname "CN=FrigaStreamer, O=Private"
+```
+
+Or with OpenSSL (Android accepts PKCS12):
+
+```bash
+openssl req -x509 -newkey rsa:4096 -nodes -days 10950 -subj "/CN=FrigaStreamer/O=Private" -keyout key.pem -out cert.pem
 ```
 
 ```bash
-./scripts/install.sh v0.2.0     # specifieke release
+openssl pkcs12 -export -inkey key.pem -in cert.pem -name frigastreamer -out frigastreamer-release.p12
 ```
 
-Windows:
+(With OpenSSL the store and key passwords are the same: the export password. Delete `key.pem` afterwards.)
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\install.ps1
-```
+### 2. Set the GitHub Secrets
 
-De scripts controleren `gh` en `adb`, downloaden de APK met `gh release download`, installeren met
-`adb install -r` op alle verbonden apparaten, starten de app en geven duidelijke foutmeldingen
-(o.a. bij `INSTALL_FAILED_UPDATE_INCOMPATIBLE`: andere sleutel → eerst `adb uninstall io.github.rutgersmit.frigastreamer`).
+| Secret | Contents |
+|---|---|
+| `SIGNING_KEYSTORE_BASE64` | the keystore, base64-encoded (single line) |
+| `SIGNING_STORE_PASSWORD` | keystore password |
+| `SIGNING_KEY_ALIAS` | alias, e.g. `frigastreamer` |
+| `SIGNING_KEY_PASSWORD` | key password |
 
-**USB:** zet op de tablet *Ontwikkelaarsopties → USB-foutopsporing* aan (ontwikkelaarsopties
-ontgrendel je door 7× op *Buildnummer* te tikken) en bevestig de vraag op het scherm.
-
-**Wireless debugging (Android 11+):** *Ontwikkelaarsopties → Draadloze foutopsporing* aan →
-*Apparaat koppelen met koppelingscode*. Dan op je computer:
+With the GitHub CLI (from a checkout of this repository):
 
 ```bash
-adb pair 192.168.1.20:37123      # IP:poort en code uit het koppelingsvenster
+./scripts/set-signing-secrets.sh frigastreamer-release.p12 signing-secrets.env
 ```
 
-```bash
-adb connect 192.168.1.20:41234   # IP:poort van het hoofdscherm 'Draadloze foutopsporing'
+where `signing-secrets.env` looks like this:
+
+```
+SIGNING_STORE_PASSWORD=...
+SIGNING_KEY_ALIAS=frigastreamer
+SIGNING_KEY_PASSWORD=...
 ```
 
-## Optioneel: lokaal bouwen
+Via the website: *Settings → Secrets and variables → Actions → New repository secret*.
+Create the base64 value with `base64 -w0 frigastreamer-release.p12` (Linux),
+`base64 -i frigastreamer-release.p12` (macOS) or in PowerShell
+`[Convert]::ToBase64String([IO.File]::ReadAllBytes("frigastreamer-release.p12"))`.
 
-Alleen voor wie wél een JDK (17+) en de Android SDK (platform 37, build-tools) heeft:
+### 3. Back up!
+
+> **Keep the keystore and the passwords in a safe place** (e.g. your password manager).
+> If you lose them, you can no longer install updates over the existing installation:
+> you would have to uninstall the app (including all settings) and reinstall it.
+> Never commit the keystore; `.gitignore` excludes `*.p12`, `*.jks` and `*.keystore`.
+
+## Optional: building locally
+
+Only for those who do have a JDK (17+) and the Android SDK (platform 37, build-tools):
 
 ```bash
-export ANDROID_HOME=/pad/naar/android-sdk
+export ANDROID_HOME=/path/to/android-sdk
 ```
 
 ```bash
 ./gradlew testDebugUnitTest assembleDebug
 ```
 
-De debug-APK (`app/build/outputs/apk/debug/app-debug.apk`) heeft package `io.github.rutgersmit.frigastreamer.debug`
-en kan naast de release-versie bestaan. Een release-build lokaal vereist de signing-variabelen
-`SIGNING_KEYSTORE_PATH`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS` en `SIGNING_KEY_PASSWORD`.
+The debug APK (`app/build/outputs/apk/debug/app-debug.apk`) has package `io.github.rutgersmit.frigastreamer.debug`
+and can be installed next to the release version. A local release build requires the signing variables
+`SIGNING_KEYSTORE_PATH`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS` and `SIGNING_KEY_PASSWORD`.
 
-## Configuratie van Frigate en go2rtc
+## Frigate and go2rtc configuration
 
-De app praat met Frigate op twee manieren:
+The app talks to Frigate in these ways:
 
-| Wat | Endpoint | Gebruik |
+| What | Endpoint | Use |
 |---|---|---|
-| Streamlijst | `http://<ip>:5000/api/go2rtc/streams` | bron van waarheid: welke RTSP-streams bestaan |
-| Configuratie | `http://<ip>:5000/api/config` | cameranamen en welke streams bij welke camera horen |
-| Versie | `http://<ip>:5000/api/version` | bereikbaarheidscontrole |
-| Video | `rtsp://<ip>:8554/<stream>` | go2rtc-restream, altijd **RTSP over TCP** |
+| Stream list | `http://<ip>:5000/api/go2rtc/streams` | source of truth: which RTSP streams exist |
+| Configuration | `http://<ip>:5000/api/config` | camera names and which streams belong to which camera |
+| Version | `http://<ip>:5000/api/version` | reachability check |
+| Video | `rtsp://<ip>:8554/<stream>` | go2rtc restream, always **RTSP over TCP** |
 
-Gebruik een **IP-adres** (bv. `192.168.1.10`), geen hostnaam: Android heeft op een LAN geen mDNS.
+Use an **IP address** (e.g. `192.168.1.10`), not a hostname: Android has no mDNS on a LAN.
 
-**API-modi** (instelbaar):
+**API modes** (configurable):
 
-- **Intern** (standaard): poort 5000, geen authenticatie.
-- **Geauthenticeerd**: poort 8971. De app logt in met `POST /api/login` (`{"user": ..., "password": ...}`)
-  en gebruikt de JWT-cookie `frigate_token`. Bij een `401` logt de app automatisch opnieuw in.
-  Frigate serveert 8971 standaard via **HTTPS met een self-signed certificaat**; zet in de app
-  *HTTPS gebruiken* en *Self-signed certificaat accepteren* aan (alleen geaccepteerd voor de ingestelde
-  host). Heb je in Frigate `tls: enabled: false` gezet, zet dan *HTTPS gebruiken* uit.
+- **Internal** (default): port 5000, no authentication.
+- **Authenticated**: port 8971. The app logs in with `POST /api/login` (`{"user": ..., "password": ...}`)
+  and uses the JWT cookie `frigate_token`. On a `401` the app logs in again automatically.
+  Frigate serves 8971 via **HTTPS with a self-signed certificate** by default; in the app, enable
+  *Use HTTPS* and *Accept Frigate's self-signed certificate* (only accepted for the configured host).
+  If you set `tls: enabled: false` in Frigate, turn *Use HTTPS* off.
 
-**RTSP-authenticatie** staat los van de API en wordt in go2rtc ingesteld:
+**RTSP authentication** is separate from the API and is configured in go2rtc:
 
 ```yaml
 go2rtc:
   rtsp:
     username: "viewer"
-    password: "geheim"
+    password: "secret"
   streams:
-    voordeur:
-      - rtsp://admin:camerawachtwoord@192.168.1.50:554/h264Preview_01_main
-    voordeur_sub:
-      - rtsp://admin:camerawachtwoord@192.168.1.50:554/h264Preview_01_sub
+    front_door:
+      - rtsp://admin:camerapassword@192.168.1.50:554/h264Preview_01_main
+    front_door_sub:
+      - rtsp://admin:camerapassword@192.168.1.50:554/h264Preview_01_sub
 ```
 
-Vul dezelfde gebruikersnaam/wachtwoord in bij *RTSP-gebruikersnaam/-wachtwoord* in de app. De app
-geeft die aan Media3 mee via de RTSP-authenticatie; ze komen niet in de eigen logs (zie
-[Bekende beperkingen](#bekende-beperkingen)).
+Enter the same username/password under *RTSP username / RTSP password* in the app. They are never
+written to the app's logs (see [Known limitations](#known-limitations)).
 
-Typische Frigate-camera die de go2rtc-restream gebruikt:
+A typical Frigate camera using the go2rtc restream:
 
 ```yaml
 cameras:
-  voordeur:
+  front_door:
     ffmpeg:
       inputs:
-        - path: rtsp://127.0.0.1:8554/voordeur
+        - path: rtsp://127.0.0.1:8554/front_door
           input_args: preset-rtsp-restream
           roles: [record]
-        - path: rtsp://127.0.0.1:8554/voordeur_sub
+        - path: rtsp://127.0.0.1:8554/front_door_sub
           input_args: preset-rtsp-restream
           roles: [detect]
 ```
 
-## Koppeling go2rtc-streams ↔ camera's
+## Mapping go2rtc streams to cameras
 
-Een Frigate-camera is alleen via RTSP (8554) bereikbaar als er een go2rtc-stream bestaat. De app
-gebruikt daarom `/api/go2rtc/streams` als bron en `/api/config` als aanvulling:
+A Frigate camera is only reachable over RTSP (8554) if a go2rtc stream exists for it. The app therefore
+uses `/api/go2rtc/streams` as the source and `/api/config` as a supplement:
 
-1. **Main stream** van camera *X*: de go2rtc-stream met exact de naam *X*. Anders: de eerste stream uit
-   `live.streams` (Frigate 0.16+) of `live.stream_name`; anders de input met rol `record` die naar
-   `rtsp://127.0.0.1:8554/<stream>` verwijst; anders een andere go2rtc-input.
-2. **Substream**: de stream volgens het **substream-patroon** (standaard `<camera>_sub`, dus
-   `voordeur_sub`); anders een go2rtc-input met rol `detect`; anders een andere `live`-stream.
-3. **Losse streams** die bij geen camera horen, worden als aparte camera getoond (met hun eigen
-   `<naam>_sub` als substream als die bestaat).
-4. **Camera's zonder go2rtc-stream** worden niet getoond, maar wel gelogd (`event=camera_without_stream`)
-   en in de instellingen vermeld met de reden.
+1. **Main stream** of camera *X*: the go2rtc stream named exactly *X*. Otherwise: the first stream from
+   `live.streams` (Frigate 0.16+) or `live.stream_name`; otherwise the input with role `record` that points
+   to `rtsp://127.0.0.1:8554/<stream>`; otherwise another go2rtc input.
+2. **Substream**: the stream matching the **substream pattern** (default `<camera>_sub`, so
+   `front_door_sub`); otherwise a go2rtc input with role `detect`; otherwise another `live` stream.
+3. **Standalone streams** that belong to no camera are shown as separate cameras (with their own
+   `<name>_sub` as substream if it exists).
+4. **Cameras without a go2rtc stream** are not shown, but are logged (`event=camera_without_stream`)
+   and listed in the settings with the reason.
 
-Het patroon is instelbaar, bv. `<camera>-low` of `{camera}_lq` (`<camera>` en `{camera}` werken beide).
-De lijst wordt opgehaald bij het starten, bij terugkeer naar de voorgrond, elke 5 minuten, wanneer
-Frigate weer bereikbaar wordt en met de knop *Cameralijst opnieuw ophalen*. Nieuwe camera's verschijnen
-en verwijderde verdwijnen automatisch. Is Frigate onbereikbaar (of meldt go2rtc tijdens een herstart
-een lege lijst), dan blijft de **laatst bekende lijst** (opgeslagen in DataStore) in gebruik.
-Handmatig toegevoegde camera's blijven altijd behouden.
+The pattern is configurable, e.g. `<camera>-low` or `{camera}_lq` (both `<camera>` and `{camera}` work).
+The list is fetched on start, when returning to the foreground, every 5 minutes, when Frigate becomes
+reachable again, and with the *Refresh camera list* button. New cameras appear and removed ones disappear
+automatically. If Frigate is unreachable (or go2rtc reports an empty list during a restart), the
+**last known list** (stored in DataStore) stays in use. Manually added cameras are always kept.
 
-## Ondersteunde codecs, H.265 en G.711
+## Supported codecs, H.265 and G.711
 
 | Codec | Status |
 |---|---|
-| H.264 video | primair ondersteund (hardwaredecoder op vrijwel elke tablet) |
-| AAC audio | primair ondersteund |
-| H.265/HEVC video | speelt af als de tablet én Media3 RTSP het ondersteunen; **niet gegarandeerd** |
-| G.711 (PCMA/PCMU), PCM (L16) audio | Media3 RTSP kan het uitpakken, maar decoderondersteuning verschilt per apparaat; **niet gegarandeerd** |
+| H.264 video | primarily supported (hardware decoder on virtually every tablet) |
+| AAC audio | primarily supported |
+| H.265/HEVC video | plays if the tablet and Media3 RTSP support it; **not guaranteed** |
+| G.711 (PCMA/PCMU), PCM (L16) audio | Media3 RTSP can depacketize it, but decoder support differs per device; **not guaranteed** |
 
-Gedrag van de app:
+App behaviour:
 
-- **Niet-ondersteunde audio**: de app verbindt automatisch opnieuw zonder audiotrack; video blijft werken
-  en bij ingeschakeld geluid zie je *"Geen geluid: audiocodec niet ondersteund"*.
-- **Niet-ondersteunde video**: de camera gaat naar de foutstatus *"Videocodec niet ondersteund"*,
-  **zonder** eindeloze reconnect-loop. Andere camera's blijven gewoon werken; *Opnieuw proberen*
-  en terugkeer naar de voorgrond geven de camera een nieuwe kans.
-- **Decoderfouten** (3× zonder enig beeld) worden ook een permanente codecfout.
+- **Unsupported audio**: the app reconnects automatically without the audio track; video keeps working,
+  and with sound enabled you see *"No sound: audio codec not supported"*.
+- **Unsupported video**: the camera goes to the error state *"Video codec not supported by this device"*,
+  **without** an endless reconnect loop. Other cameras keep working; *Retry* and returning to the
+  foreground give the camera another chance.
+- **Decoder errors** (3× without any frame) also become a permanent codec error.
 
-**Oplossing: laat go2rtc transcoderen** naar H.264/AAC. Dat kost **extra CPU op de Frigate-host**
-(zeker bij hoge resoluties; gebruik waar mogelijk hardware-acceleratie, bv. `#hardware`). De app
-transcodeert nooit zelf.
+**Solution: let go2rtc transcode** to H.264/AAC. This costs **extra CPU on the Frigate host**
+(especially at high resolutions; use hardware acceleration where possible, e.g. `#hardware`). The app
+never transcodes itself.
 
 ```yaml
 go2rtc:
   streams:
     garage_raw:
       - rtsp://admin:pw@192.168.1.51:554/h265stream
-    # Wat de app (en Frigate) gebruikt: H.264 + AAC
+    # What the app (and Frigate) uses: H.264 + AAC
     garage:
       - "ffmpeg:garage_raw#video=h264#audio=aac"
-    # Reolink-deurbel: video is al H.264, alleen de G.711/PCM-audio omzetten
-    deurbel:
+    # Reolink doorbell: video is already H.264, only convert the G.711/PCM audio
+    doorbell:
       - rtsp://admin:pw@192.168.1.52:554/h264Preview_01_main
-      - "ffmpeg:deurbel#audio=aac"
+      - "ffmpeg:doorbell#audio=aac"
 ```
 
-Alleen een substream transcoderen (goedkoper) kan ook: geef de app dan via het substream-patroon of per
-camera (*Substream als actief*) de H.264-variant.
+Transcoding only a substream (cheaper) also works: then point the app to the H.264 variant via the
+substream pattern or per camera (*Substream when active*).
 
-## Reconnect-strategie, watchdog en offline-status
+## Reconnect strategy, watchdog and offline status
 
-Elke camera heeft een eigen `StreamController` met één centrale state-machine:
+Every camera has its own `StreamController` with one central state machine:
 
 ```
-Idle ─attach→ Connecting ─eerste frame→ Playing
-                 ▲   │                      │ fout / watchdog / netwerkverlies
+Idle ─attach→ Connecting ─first frame→ Playing
+                 ▲   │                      │ error / watchdog / network loss
                  │   └──────────────────────┤
-                 └── backoff-timer ── Reconnecting ◀┘
- Connecting/Reconnecting langer dan de offline-drempel ⇒ Offline (reconnect loopt door)
- permanente fout (codec, RTSP-auth) ⇒ Error (geen automatische reconnects)
- detach (buiten venster / app naar achtergrond) ⇒ Idle (speler volledig vrijgegeven)
+                 └── backoff timer ── Reconnecting ◀┘
+ Connecting/Reconnecting longer than the offline threshold ⇒ Offline (reconnect keeps running)
+ permanent error (codec, RTSP auth) ⇒ Error (no automatic reconnects)
+ detach (outside window / app to background) ⇒ Idle (player fully released)
 ```
 
-- **Backoff:** 1 s, 2 s, 4 s, 8 s, 16 s, 30 s, 30 s, … (min/max instelbaar). Er wordt onbeperkt opnieuw
-  geprobeerd bij tijdelijke fouten, ook als de camera als offline wordt getoond. De backoff wordt pas
-  gereset na **10 s stabiel beeld**, zodat een flappende verbinding niet elke seconde opnieuw verbindt.
-- **Geen dubbele reconnects:** elke nieuwe poging annuleert eerst de vorige timer; callbacks van een
-  oude speler-sessie worden via een sessienummer genegeerd. Alles loopt op de main thread.
-- **Connect-time-out:** komt er binnen 20 s na het verbinden geen eerste frame, dan telt dat als mislukte
-  poging (ruim genoeg voor camera's met een keyframe-interval van 10 s).
-- **Frame-watchdog:** de speler telt gerenderde frames via Media3's `VideoFrameMetadataListener`
-  (plus door de decoder verwerkte frames voor een voorgeladen speler zonder zichtbare surface).
-  `currentPosition` wordt niet gebruikt. Komt er tijdens *Playing* 5 s (instelbaar) geen nieuw frame,
-  dan wordt de stream als vastgelopen beschouwd en herstart. Tijdens het opbouwen van de verbinding is de
-  watchdog niet actief (dan geldt de connect-time-out); tijdens *buffering* geldt de dubbele time-out.
-  Bij een vrijgegeven speler stopt de watchdog.
-- **Netwerk:** via `ConnectivityManager`-callbacks (zonder eis van internettoegang, een LAN zonder
-  internet is prima). Bij netwerkverlies worden streams gestopt en reconnects gepauzeerd
-  (*"Volgende poging: zodra het netwerk terug is"*). Bij herstel verbindt eerst de actieve camera
-  direct, daarna de buren; is Frigate nog niet bereikbaar, dan neemt de normale backoff het over.
-- **Offline-weergave:** korter dan de offline-drempel (standaard 20 s) blijft het laatste beeld staan met
-  een subtiele *Verbinden...*-indicator. Daarna een duidelijk scherm: cameranaam, *Camera offline*,
-  tijdstip van het laatste beeld, oorzaak en aftellen tot de volgende poging. Zodra er weer beeld is,
-  verdwijnt het scherm direct.
-- **Oorzaak** (waar mogelijk onderscheiden met een periodieke API- en RTSP-poortcontrole):
-  *Frigate niet bereikbaar*, *Frigate bereikbaar maar RTSP-server (go2rtc) niet*, *Frigate bereikbaar
-  maar deze camera niet*, *verbinding open maar geen nieuwe beelden*, *codec-/decoderprobleem*.
+- **Backoff:** 1 s, 2 s, 4 s, 8 s, 16 s, 30 s, 30 s, … (min/max configurable). Retries are unlimited on
+  transient errors, also while the camera is shown as offline. The backoff is only reset after
+  **10 s of stable video**, so a flapping connection does not reconnect every second.
+- **No duplicate reconnects:** every new attempt first cancels the previous timer; callbacks from an
+  old player session are ignored via a session number. Everything runs on the main thread.
+- **Connect timeout:** if no first frame arrives within 20 s of connecting, it counts as a failed
+  attempt (generous enough for cameras with a 10 s keyframe interval).
+- **Frame watchdog:** the player counts rendered frames via Media3's `VideoFrameMetadataListener`
+  (plus frames processed by the decoder for a preloaded player without a visible surface).
+  `currentPosition` is not used. If no new frame arrives for 5 s (configurable) while *Playing*,
+  the stream is considered stalled and restarted. During connection setup the watchdog is not active
+  (the connect timeout applies then); during *buffering* the timeout is doubled. The watchdog stops
+  when a player is released.
+- **Network:** via `ConnectivityManager` callbacks (without requiring internet access; a LAN without
+  internet is fine). On network loss, streams are stopped and reconnects paused
+  (*"Next attempt: as soon as the network is back"*). On recovery the active camera connects
+  immediately, then the neighbours; if Frigate is not reachable yet, the normal backoff takes over.
+- **Offline display:** for less than the offline threshold (default 20 s) the last frame stays visible
+  with a subtle *Connecting…* indicator. After that, a clear screen: camera name, *Camera offline*,
+  time of the last frame, cause and a countdown to the next attempt. As soon as there is video again,
+  the screen disappears immediately.
+- **Cause** (distinguished where possible with a periodic API and RTSP port check):
+  *Frigate is not reachable*, *Frigate is reachable, but the RTSP server (go2rtc) is not*,
+  *Frigate is reachable, but this camera is not*, *connection open, but no new frames*,
+  *codec or decoder problem*.
 
-**Spelervenster:** maximaal 3 ExoPlayer-instanties (actief + 0, 1 of 2 buren, standaard 1 = de volgende).
-Het venster is gebaseerd op de camera-index, niet op de pager-pagina, zodat bij 1 of 2 camera's nooit twee
-spelers voor dezelfde camera ontstaan. Spelers buiten het venster worden **eerst** vrijgegeven, daarna pas
-nieuwe aangemaakt. Buren worden pas voorgeladen als de actieve camera beeld heeft (of na 3 s) en gebruiken
-de substream, gemute. Wordt een buur actief, dan schakelt die naar de voorkeursstream (zelfde speler).
+**Player window:** at most 3 ExoPlayer instances (active + 0, 1 or 2 neighbours, default 1 = the next one).
+The window is based on the camera index, not the pager page, so with 1 or 2 cameras there are never two
+players for the same camera. Players outside the window are released **first**; only then are new ones
+created. Neighbours are only preloaded once the active camera has video (or after 3 s) and use the
+substream, muted. When a neighbour becomes active, it switches to the preferred stream (same player).
 
-**Decoderlimieten:** veel tablets hebben maar 2–4 hardwaredecoders. Faalt de decoder van een voorgeladen
-speler, dan wordt die speler opgegeven en het preload-venster voor de rest van de sessie verkleind. Faalt
-de actieve camera, dan worden eerst alle voorgeladen spelers vrijgegeven, wordt het venster verkleind en
-de actieve camera direct opnieuw geprobeerd. Pas als het óók zonder andere spelers mislukt, wordt het als
-codecfout getoond. Media3's decoder-fallback (bv. naar een softwaredecoder) staat aan.
+**Decoder limits:** many tablets have only 2–4 hardware decoders. If the decoder of a preloaded player
+fails, that player is given up and the preload window is reduced for the rest of the session. If the
+active camera fails, all preloaded players are released first, the window is reduced and the active
+camera is retried immediately. Only if it also fails without other players is it shown as a codec error.
+Media3's decoder fallback (e.g. to a software decoder) is enabled.
 
-**Lifecycle:** bij `ON_STOP` (scherm uit, standby, andere app) worden alle spelers en RTSP-verbindingen
-vrijgegeven; bij `ON_START` wordt de laatst geselecteerde camera met het venster hersteld. Dit is
-idempotent: herhaald wisselen levert geen dubbele spelers of reconnects op. `ON_PAUSE` stopt bewust
-niets (in split-screen is de app gepauzeerd maar zichtbaar). Terwijl het instellingenscherm open is,
-draaien er geen streams.
+**Lifecycle:** on `ON_STOP` (screen off, standby, other app) all players and RTSP connections are released;
+on `ON_START` the last selected camera and its window are restored. This is idempotent: repeated switching
+never causes duplicate players or reconnects. `ON_PAUSE` deliberately stops nothing (in split-screen the
+app is paused but visible). While the settings screen is open, no streams are running.
 
-## Home-app-modus (automatisch starten na reboot)
+## Home app mode (auto-start after reboot)
 
-Sinds Android 10 mag een app vanuit een `BOOT_COMPLETED`-receiver geen Activity meer starten. De
-betrouwbare oplossing: de app kan als **home-app (launcher)** dienen. Kies hem eenmalig als standaard
-home-app; na een reboot (of bij de home-knop) start Android hem dan altijd automatisch.
+Since Android 10 an app may no longer start an Activity from a `BOOT_COMPLETED` receiver. The reliable
+solution: the app can act as a **home app (launcher)**. Choose it once as the default home app; after a
+reboot (or when pressing the home button) Android then always starts it automatically.
 
-**Instellen:** druk op de home-knop en kies *FrigaStreamer* → *Altijd*. Of: app-instellingen → *Overig* →
-*Standaard home-app instellen / terugzetten*, of Android *Instellingen → Apps → Standaard-apps → Startscherm-app*.
+**Set up:** press the home button and choose *FrigaStreamer* → *Always*. Or: app settings → *Other* →
+*Set / restore default home app*, or Android *Settings → Apps → Default apps → Home app*.
 
 Via ADB:
 
@@ -437,8 +475,8 @@ Via ADB:
 adb shell cmd package set-home-activity io.github.rutgersmit.frigastreamer/.ui.MainActivity
 ```
 
-**Terugdraaien:** dezelfde knop in de app-instellingen, of in Android *Startscherm-app* een andere
-launcher kiezen. Via ADB (voorbeeld voor de Pixel-launcher; zoek je eigen launcher op met de eerste opdracht):
+**Undo:** the same button in the app settings, or choose another launcher under Android *Home app*.
+Via ADB (example for the Pixel launcher; look up your own launcher with the first command):
 
 ```bash
 adb shell cmd package query-activities -a android.intent.action.MAIN -c android.intent.category.HOME
@@ -448,64 +486,67 @@ adb shell cmd package query-activities -a android.intent.action.MAIN -c android.
 adb shell cmd package set-home-activity com.google.android.apps.nexuslauncher/.NexusLauncherActivity
 ```
 
-Kom je niet meer uit de app (instellingen bereik je altijd via lang indrukken of het tandwiel), dan
-werkt bovenstaande ADB-opdracht ook, of verwijder de app met `adb uninstall io.github.rutgersmit.frigastreamer`.
+If you can no longer get out of the app (settings are always reachable via long-press or the gear icon),
+the ADB command above also works, or uninstall the app with `adb uninstall io.github.rutgersmit.frigastreamer`.
 
-**Waarom geen `BOOT_COMPLETED`-receiver?** Die zou alleen werken met de speciale permissie
-`SYSTEM_ALERT_WINDOW` (via ADB toe te kennen), en het gedrag verschilt per fabrikant/Android-versie.
-Omdat ik dat niet op de doel-tablet heb kunnen aantonen, zit er bewust geen receiver in de app; de
-home-app-modus is de ondersteunde weg.
+**Why no `BOOT_COMPLETED` receiver?** It would only work with the special permission
+`SYSTEM_ALERT_WINDOW` (granted via ADB), and the behaviour differs per manufacturer and Android version.
+Because this could not be demonstrated on a target tablet, the app deliberately has no such receiver;
+home app mode is the supported route.
 
-## Instellingen
+## Settings
 
-Bereikbaar via het **tandwiel** (tik eerst op het scherm als de knoppen verborgen zijn) of door het
-scherm **lang in te drukken**. Alles wordt opgeslagen in Jetpack DataStore.
+Reachable via the **gear icon** (tap the screen first if the buttons are hidden) or by **long-pressing**
+the screen. Everything is stored in Jetpack DataStore.
 
-- **Frigate:** IP-adres, API-modus (intern 5000 / geauthenticeerd 8971 met login), API-poort, HTTPS en
-  self-signed (alleen geauthenticeerd), API-gebruiker/-wachtwoord, RTSP-poort (8554), RTSP-gebruiker/
-  -wachtwoord (go2rtc), substream-patroon. *Opslaan* haalt de cameralijst direct opnieuw op.
-- **Cameralijst:** status van de API, aantal streams, camera's zonder stream, *Cameralijst opnieuw ophalen*,
-  *Camera handmatig toevoegen*. Per camera: zichtbaar/verborgen, volgorde (▲/▼), *Substream als actief*,
-  *Bewerken* (naam, main-/sub-URL; bij een automatische camera alleen als je de URL echt wijzigt) en
-  *Verwijderen* (handmatige camera's).
-- **Herstel:** preload-venster (0/1/2), offline-drempel, frame-watchdog aan/uit en time-out, backoff min/max.
-- **Overig:** altijd gemute starten, schermoriëntatie (liggend/staand/automatisch), debug-overlay,
-  standaard home-app instellen/terugzetten, versie.
+- **Frigate:** IP address, API mode (internal 5000 / authenticated 8971 with login), API port, HTTPS and
+  self-signed (authenticated only), API username/password, RTSP port (8554), RTSP username/password
+  (go2rtc), substream pattern. *Save and fetch camera list* refreshes the camera list immediately.
+- **Camera list:** API status, number of streams, cameras without a stream, *Refresh camera list*,
+  *Add camera manually*. Per camera: visible/hidden, order (▲/▼), *Substream when active*,
+  *Edit* (name, main/sub URL; for an automatic camera only when you actually change the URL) and
+  *Delete* (manual cameras).
+- **Recovery:** preload window (0/1/2), offline threshold, frame watchdog on/off and timeout, backoff min/max.
+- **Other:** always start muted, screen orientation (landscape/portrait/automatic), debug overlay,
+  set/restore default home app, version.
 
-Geluid staat standaard uit; de mute-knop werkt voor alle camera's en de keuze blijft bewaard (met
-*Altijd gemute starten* aan begint de app altijd gemute). Alleen de actieve camera speelt ooit geluid af.
-Credentials staan gewoon in DataStore (LAN-app op een eigen apparaat; geen Keystore of het verouderde
-`EncryptedSharedPreferences`), maar komen nooit in logs.
+Sound is off by default; the mute button applies to all cameras and the choice is remembered (with
+*Always start muted* on, the app always starts muted). Only the active camera ever plays sound.
+Credentials are stored plainly in DataStore (LAN app on a personal device; no Keystore or the deprecated
+`EncryptedSharedPreferences`), but never end up in logs.
 
-## Logs uitlezen via ADB
+The UI language follows the device language: English by default, Dutch when the device is set to Dutch.
+The debug overlay is developer diagnostics and is always English.
 
-Alle regels zijn gestructureerd (`event=... key=value`). Tags:
+## Reading logs via ADB
 
-| Tag | Inhoud |
+All lines are structured (`event=... key=value`). Tags:
+
+| Tag | Contents |
 |---|---|
 | `FS.Cam.<camera>` | per camera: `connect_start`, `connect_success`, `connection_lost`, `connect_failed`, `watchdog_triggered`, `reconnect_scheduled`, `reconnect_execute`, `codec_error`, `stream_error`, `offline`, `player_created`, `player_released`, `network_lost`, `backoff_reset` |
-| `FS.Manager` | venster, `preload_window_reduced`, `release_preloads_for_active`, `start`/`stop` |
-| `FS.Net` | netwerk weg/terug |
-| `FS.Api`, `FS.Health` | cameralijst, login, bereikbaarheid van Frigate/RTSP |
-| `FS.App` | lifecycle (`ON_START`, `ON_STOP`), versie |
+| `FS.Manager` | window, `preload_window_reduced`, `release_preloads_for_active`, `start`/`stop` |
+| `FS.Net` | network down/up |
+| `FS.Api`, `FS.Health` | camera list, login, Frigate/RTSP reachability |
+| `FS.App` | lifecycle (`ON_START`, `ON_STOP`), version |
 
 ```bash
 adb logcat -v time | grep " FS\."
 ```
 
 ```bash
-adb logcat -v time '*:S' FS.Manager:V FS.Net:V 'FS.Cam.voordeur:V'
+adb logcat -v time '*:S' FS.Manager:V FS.Net:V 'FS.Cam.front_door:V'
 ```
 
 ```bash
 adb logcat -v time | grep -E "watchdog_triggered|reconnect_scheduled|codec_error|player_(created|released)"
 ```
 
-Geheugen controleren: `adb shell dumpsys meminfo io.github.rutgersmit.frigastreamer`.
+Check memory: `adb shell dumpsys meminfo io.github.rutgersmit.frigastreamer`.
 
-## Testomgeving (`testenv/`) en storingen simuleren
+## Test environment (`testenv/`) and simulating failures
 
-Een Docker-omgeving om de app zonder Frigate te testen:
+A Docker environment to test the app without Frigate:
 
 ```bash
 cd testenv
@@ -515,85 +556,89 @@ cd testenv
 docker compose up -d
 ```
 
-| Service | Poort | Rol |
+| Service | Port | Role |
 |---|---|---|
-| `mediamtx` | 8554 (RTSP), 9997 (API) | speelt go2rtc: 13 testpatroonstreams (ffmpeg) |
-| `cam-voordeur` | – | apart ffmpeg-proces voor `voordeur` + `voordeur_sub` (om te stoppen/pauzeren) |
-| `frigate-mock` | 5000, 8971 | bootst `/api/go2rtc/streams`, `/api/config`, `/api/version`, `/api/login` na |
+| `mediamtx` | 8554 (RTSP), 9997 (API) | plays go2rtc: 13 test pattern streams (ffmpeg) |
+| `cam-front-door` | – | separate ffmpeg process for `front_door` + `front_door_sub` (to stop/pause) |
+| `frigate-mock` | 5000, 8971 | mimics `/api/go2rtc/streams`, `/api/config`, `/api/version`, `/api/login` |
 
-Streams: `voordeur`+`voordeur_sub` (H.264 720p + AAC), `tuin`+`tuin_sub` (H.264 + AAC), `oprit` (geen audio),
-`garage` (**H.265**), `deurbel` (H.264 + **G.711 A-law**, in de config gekoppeld aan camera `voorkant_deurbel`),
-`schuur` (H.264 + **PCM L16**), `snel_gop` (keyframe elke 0,5 s), `traag_gop` (keyframe elke **10 s**),
-`achterdeur` (1080p), `carport`+`carport_sub` (niet in de config: losse camera). In de config staan ook
-`zolder` (zonder go2rtc-stream) en `oude_camera` (uitgeschakeld) om het melden van ontbrekende camera's te testen.
+Streams: `front_door`+`front_door_sub` (H.264 720p + AAC), `garden`+`garden_sub` (H.264 + AAC),
+`driveway` (no audio), `garage` (**H.265**), `doorbell` (H.264 + **G.711 A-law**, mapped in the config to
+camera `front_doorbell`), `shed` (H.264 + **PCM L16**), `fast_gop` (keyframe every 0.5 s), `slow_gop`
+(keyframe every **10 s**), `back_door` (1080p), `carport`+`carport_sub` (not in the config: standalone camera).
+The config also contains `attic` (no go2rtc stream) and `old_camera` (disabled) to test reporting of
+missing cameras.
 
-In de app: host = IP van de computer met Docker, API-modus intern, poort 5000. Voor de geauthenticeerde
-modus: poort 8971, gebruiker/wachtwoord `admin`/`admin`, **HTTPS uit** (de mock gebruikt HTTP; tokens
-verlopen na `TOKEN_TTL` = 300 s, zodat automatisch opnieuw inloggen te testen is).
+In the app: host = IP of the computer running Docker, API mode internal, port 5000. For authenticated mode:
+port 8971, username/password `admin`/`admin`, **HTTPS off** (the mock uses HTTP; tokens expire after
+`TOKEN_TTL` = 300 s, so automatically logging in again can be tested).
 
-Alle streams controleren (vereist `ffprobe`): `./check-streams.sh [host]`.
+Check all streams (requires `ffprobe`): `./check-streams.sh [host]`.
 
-**Storingen simuleren:**
+**Simulating failures:**
 
-| Scenario | Opdracht | Verwacht in de app |
+| Scenario | Command | Expected in the app |
 |---|---|---|
-| Eén camera offline | `docker compose stop cam-voordeur` … `docker compose start cam-voordeur` | alleen voordeur: *Verbinden...* → na 20 s *Camera offline* (RTSP 404); andere camera's spelen door; na start herstel |
-| Verbinding open, geen frames | `docker compose pause cam-voordeur` … `docker compose unpause cam-voordeur` | na 5 s `watchdog_triggered`, reconnect |
-| "Frigate" offline (60 s) | `docker compose stop mediamtx; sleep 60; docker compose start mediamtx` | alle camera's offline, backoff 1→30 s, herstel ≤ 30 s na start |
-| API onbereikbaar | `docker compose stop frigate-mock` | streams spelen door; laatst bekende cameralijst blijft; *Frigate-API: onbereikbaar* |
-| Herstart als `docker restart frigate` | `docker compose restart mediamtx frigate-mock` | korte *Verbinden...*, daarna herstel |
-| Hoge keyframe-interval | swipe naar `traag_gop` | eerste beeld tot ~10 s, géén watchdog-herstart |
-| Codecs | swipe naar `garage` / `deurbel` / `schuur` | afhankelijk van de tablet: beeld, of een duidelijke codecmelding / *geen geluid* |
+| One camera offline | `docker compose stop cam-front-door` … `docker compose start cam-front-door` | only front_door: *Connecting…* → after 20 s *Camera offline* (RTSP 404); other cameras keep playing; recovery after start |
+| Connection open, no frames | `docker compose pause cam-front-door` … `docker compose unpause cam-front-door` | after 5 s `watchdog_triggered`, reconnect |
+| "Frigate" offline (60 s) | `docker compose stop mediamtx; sleep 60; docker compose start mediamtx` | all cameras offline, backoff 1→30 s, recovery ≤ 30 s after start |
+| API unreachable | `docker compose stop frigate-mock` | streams keep playing; last known camera list stays; *Frigate API: unreachable* |
+| Restart like `docker restart frigate` | `docker compose restart mediamtx frigate-mock` | brief *Connecting…*, then recovery |
+| Long keyframe interval | swipe to `slow_gop` | first frame up to ~10 s, **no** watchdog restart |
+| Codecs | swipe to `garage` / `doorbell` / `shed` | depending on the tablet: video, or a clear codec message / *no sound* |
 
-Wifi-onderbrekingen simuleer je op de tablet zelf (wifi uit/aan).
+Simulate Wi-Fi interruptions on the tablet itself (Wi-Fi off/on).
 
 ## Tests
 
-- **Unit tests** (`./gradlew testDebugUnitTest`): backoff (incl. reset), state-machine-overgangen,
-  foutclassificatie, offline-drempel, watchdog (incl. geen herstart tijdens verbindingsopbouw), annuleren van
-  reconnects en geen dubbele reconnects, spelervenster (wrap-around, 1/2/10+ camera's, nooit > 3 spelers),
-  automatisch verkleinen bij decoderfouten, stream↔camera-koppeling, cameralijst, JSON-parsing, redactie van
-  credentials, en de 7 praktijkscenario's uit de opdracht (`ScenarioTest`). De `StreamController` wordt getest
-  met een fake speler, fake server, fake klok en `kotlinx-coroutines-test` (virtuele tijd).
-- **Integratietest** tegen `testenv/` (opt-in):
+- **Unit tests** (`./gradlew testDebugUnitTest`): backoff (incl. reset), state machine transitions,
+  error classification, offline threshold, watchdog (incl. no restart during connection setup), cancelling
+  reconnects and no duplicate reconnects, player window (wrap-around, 1/2/10+ cameras, never > 3 players),
+  automatic reduction on decoder errors, stream↔camera mapping, camera list, JSON parsing, credential
+  redaction, EN/NL string resource parity, and the 7 real-world scenarios from the assignment (`ScenarioTest`).
+  The `StreamController` is tested with a fake player, fake server, fake clock and `kotlinx-coroutines-test`
+  (virtual time).
+- **Integration test** against `testenv/` (opt-in):
   `FS_TESTENV_HOST=127.0.0.1 ./gradlew testDebugUnitTest --tests '*TestEnvIntegrationTest*'`
-  (met `FS_TESTENV_TOKEN_TTL=<s>` ook het verlopen van de JWT; start de mock dan met dezelfde `TOKEN_TTL`).
-- **Op de tablet:** zie [TESTING.md](TESTING.md).
+  (with `FS_TESTENV_TOKEN_TTL=<s>` also JWT expiry; then start the mock with the same `TOKEN_TTL`).
+- **On the tablet:** see [TESTING.md](TESTING.md).
 
-## Bekende beperkingen
+## Known limitations
 
-- **RTSP-credentials in de URI:** Media3 RTSP ondersteunt authenticatie alléén via de userinfo van de URI
-  (`rtsp://user:pass@...`). De app voegt de go2rtc-credentials pas in de spelerlaag toe, logt zelf alleen
-  geredacteerde URL's en zet de RTSP-debuglogging van Media3 uit. Media3 zelf haalt de userinfo uit de
-  requests; in de eigen foutmeldingen van Media3 is ons geen URL-logging bekend, maar dat valt buiten de
-  controle van de app.
-- **Cleartext:** Android kan cleartext-verkeer niet beperken tot IP-bereiken (Network Security Config
-  accepteert alleen hostnamen). Cleartext staat daarom app-breed aan; de app maakt alleen verbinding met de
-  ingestelde Frigate-host en handmatig ingevoerde URL's.
-- **H.265, G.711, PCM:** afhankelijk van de tablet; zie [codecs](#ondersteunde-codecs-h265-en-g711).
-- **Decoderlimieten** verschillen per tablet; het venster verkleint zich automatisch, maar alleen voor de
-  huidige sessie (na een herstart van de app wordt weer het ingestelde venster geprobeerd).
-- **Laatste beeld bij offline:** het laatste beeld blijft staan zolang de camera een speler heeft (in het
-  venster). Na swipen of terugkeer uit de achtergrond is er pas beeld na de eerste nieuwe frame.
-- **Twee camera's:** links en rechts van de huidige camera staat dezelfde camera. De speler wordt aan de
-  rechterpagina gekoppeld; tijdens het naar rechts swipen zie je links daarom kort een zwarte pagina met naam.
-- **Geen automatische start na boot zonder home-app-modus** (zie hierboven).
-- **Netwerkdetectie** ziet alleen of de tablet een netwerk heeft, niet of Frigate bereikbaar is; daarvoor
-  zijn de reconnect-backoff en de periodieke bereikbaarheidscontrole.
+- **RTSP credentials in the URI:** Media3 RTSP only supports authentication via the URI's userinfo
+  (`rtsp://user:pass@...`). The app only adds the go2rtc credentials in the player layer, only logs
+  redacted URLs itself and turns off Media3's RTSP debug logging. Media3 strips the userinfo from the
+  requests; we are not aware of URL logging in Media3's own error messages, but that is outside the
+  app's control.
+- **Cleartext:** Android cannot restrict cleartext traffic to IP ranges (Network Security Config only
+  accepts hostnames). Cleartext is therefore enabled app-wide; the app only connects to the configured
+  Frigate host and manually entered URLs.
+- **H.265, G.711, PCM:** depends on the tablet; see [codecs](#supported-codecs-h265-and-g711).
+- **Decoder limits** differ per tablet; the window shrinks automatically, but only for the current
+  session (after an app restart the configured window is tried again).
+- **Last frame when offline:** the last frame stays visible as long as the camera has a player (inside
+  the window). After swiping or returning from the background, there is only video after the first new frame.
+- **Two cameras:** the same camera is to the left and to the right of the current one. The player is
+  attached to the right page; while swiping right you therefore briefly see a black page with the name on the left.
+- **No auto-start after boot without home app mode** (see above).
+- **Network detection** only sees whether the tablet has a network, not whether Frigate is reachable;
+  that is what the reconnect backoff and the periodic reachability check are for.
+- **Error details** from the network layer (e.g. *"Frigate API unreachable: …"*) include a technical
+  message that is always English.
 
 ## Troubleshooting
 
-| Symptoom | Oplossing |
+| Symptom | Solution |
 |---|---|
-| Geen camera's | Klopt het IP-adres? `curl http://<ip>:5000/api/go2rtc/streams` vanaf een andere machine. In de instellingen staat waarom camera's ontbreken. |
-| Camera ontbreekt | Er is geen go2rtc-stream voor die camera (zie *Camera's zonder go2rtc-stream* in de instellingen), of het substream-patroon klopt niet. |
-| *RTSP-authenticatie mislukt* | Vul RTSP-gebruiker/-wachtwoord in zoals in `go2rtc: rtsp:` staat. |
-| *Videocodec niet ondersteund* | Laat go2rtc naar H.264 transcoderen (zie boven). |
-| Geen geluid | Ontmuten? Bij *audiocodec niet ondersteund*: `#audio=aac` in go2rtc. |
-| Actieve camera start niet, buren wel | Decoderlimiet: zet het preload-venster op 0 of 1, of gebruik substreams. Debug-overlay toont *AUTO VERKLEIND*. |
-| Inloggen mislukt (8971) | Controleer gebruiker/wachtwoord en de HTTPS-instelling. |
-| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | De geïnstalleerde app is met een andere sleutel ondertekend: eenmalig `adb uninstall io.github.rutgersmit.frigastreamer`. |
-| Release-workflow faalt met *signing ontbreekt* | Zet de vier GitHub Secrets (zie [Eenmalige setup](#eenmalige-setup-keystore--github-secrets)). |
-| Obtainium vindt geen release | Token met *Contents: Read-only* op deze repository ingevuld? Bestaat er een release (niet alleen een tag)? |
+| No cameras | Is the IP address correct? `curl http://<ip>:5000/api/go2rtc/streams` from another machine. The settings show why cameras are missing. |
+| Camera missing | There is no go2rtc stream for that camera (see *Cameras without a go2rtc stream* in the settings), or the substream pattern does not match. |
+| *RTSP authentication failed* | Enter the RTSP username/password as configured under `go2rtc: rtsp:`. |
+| *Video codec not supported* | Let go2rtc transcode to H.264 (see above). |
+| No sound | Unmuted? With *audio codec not supported*: `#audio=aac` in go2rtc. |
+| Active camera does not start, neighbours do | Decoder limit: set the preload window to 0 or 1, or use substreams. The debug overlay shows *AUTO-REDUCED*. |
+| Login fails (8971) | Check username/password and the HTTPS setting. |
+| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | The installed app is signed with a different key: once `adb uninstall io.github.rutgersmit.frigastreamer`. |
+| Release workflow fails with *signing is missing* | Set the four GitHub Secrets (see [One-time setup](#one-time-setup-keystore-and-github-secrets-also-for-forks)). |
+| Obtainium finds no release | Is there a release (not just a tag)? Hit the GitHub API rate limit? Add an optional token in Obtainium. |
 
-Zet bij twijfel de **debug-overlay** aan (instellingen → *Overig*) en lees de logs (`adb logcat | grep " FS\."`).
+When in doubt, turn on the **debug overlay** (settings → *Other*) and read the logs (`adb logcat | grep " FS\."`).
