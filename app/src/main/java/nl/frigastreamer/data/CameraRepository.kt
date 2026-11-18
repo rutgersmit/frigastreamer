@@ -66,7 +66,11 @@ class CameraRepository(
         val now = clock.wallMs()
         log.i(TAG, "event=camera_list_refresh reason=$reason")
         val streams = try {
-            client.fetchStreamNames()
+            client.fetchStreamNames().also {
+                // Een lege lijst komt in de praktijk voor tijdens een (her)start van go2rtc.
+                // Behandel dat als storing, zodat de laatst bekende lijst behouden blijft.
+                if (it.isEmpty()) throw FrigateApiException("go2rtc meldt (nog) geen streams")
+            }
         } catch (e: Exception) {
             val msg = "Frigate-API onbereikbaar: ${e.message ?: e.javaClass.simpleName}"
             log.w(TAG, "event=camera_list_refresh_failed using_cache=true error=${e.javaClass.simpleName}")

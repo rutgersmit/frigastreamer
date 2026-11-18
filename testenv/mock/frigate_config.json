@@ -1,0 +1,25 @@
+{
+  "cameras": {
+    "voordeur": {
+      "enabled": true,
+      "ffmpeg": {"inputs": [
+        {"path": "rtsp://127.0.0.1:8554/voordeur", "roles": ["record"]},
+        {"path": "rtsp://127.0.0.1:8554/voordeur_sub", "roles": ["detect"]}
+      ]}
+    },
+    "tuin": {"enabled": true, "ffmpeg": {"inputs": [{"path": "rtsp://127.0.0.1:8554/tuin", "roles": ["record", "detect"]}]}},
+    "oprit": {"enabled": true, "ffmpeg": {"inputs": [{"path": "rtsp://127.0.0.1:8554/oprit", "roles": ["record", "detect"]}]}},
+    "garage": {"enabled": true, "ffmpeg": {"inputs": [{"path": "rtsp://127.0.0.1:8554/garage", "roles": ["record", "detect"]}]}},
+    "voorkant_deurbel": {
+      "enabled": true,
+      "ffmpeg": {"inputs": [{"path": "rtsp://127.0.0.1:8554/deurbel", "roles": ["record", "detect", "audio"]}]},
+      "live": {"streams": {"Main": "deurbel"}}
+    },
+    "schuur": {"enabled": true, "ffmpeg": {"inputs": [{"path": "rtsp://127.0.0.1:8554/schuur", "roles": ["record"]}]}},
+    "snel_gop": {"enabled": true, "ffmpeg": {"inputs": [{"path": "rtsp://127.0.0.1:8554/snel_gop", "roles": ["detect"]}]}},
+    "traag_gop": {"enabled": true, "ffmpeg": {"inputs": [{"path": "rtsp://127.0.0.1:8554/traag_gop", "roles": ["detect"]}]}},
+    "achterdeur": {"enabled": true, "ffmpeg": {"inputs": [{"path": "rtsp://127.0.0.1:8554/achterdeur", "roles": ["record"]}]}},
+    "zolder": {"enabled": true, "ffmpeg": {"inputs": [{"path": "rtsp://192.168.1.60:554/stream1", "roles": ["record", "detect"]}]}},
+    "oude_camera": {"enabled": false}
+  }
+}

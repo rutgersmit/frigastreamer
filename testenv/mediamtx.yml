@@ -1,0 +1,106 @@
+# MediaMTX als vervanger van go2rtc. Alleen RTSP over TCP (zoals de app gebruikt).
+logLevel: warn
+rtsp: yes
+rtspTransports: [tcp]
+rtspAddress: :8554
+rtmp: no
+hls: no
+webrtc: no
+srt: no
+api: yes
+apiAddress: :9997
+
+# Testomgeving: iedereen mag publiceren, lezen en de API gebruiken (geen RTSP-auth).
+authInternalUsers:
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: publish
+      - action: read
+      - action: playback
+      - action: api
+
+pathDefaults:
+  runOnInitRestart: yes
+
+paths:
+  # Wordt gepubliceerd door de container cam-voordeur (te stoppen/pauzeren).
+  voordeur:
+  voordeur_sub:
+
+  # Normale situatie: H.264 + AAC, met substream.
+  tuin:
+    runOnInit: >-
+      ffmpeg -hide_banner -loglevel warning -re -f lavfi -i smptebars=size=960x540:rate=20
+      -f lavfi -i sine=frequency=660:sample_rate=48000
+      -c:v libx264 -preset ultrafast -tune zerolatency -g 20 -c:a aac -b:a 64k
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/tuin
+  tuin_sub:
+    runOnInit: >-
+      ffmpeg -hide_banner -loglevel warning -re -f lavfi -i smptebars=size=480x270:rate=10
+      -c:v libx264 -preset ultrafast -tune zerolatency -g 10 -an
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/tuin_sub
+
+  # Alleen video (geen audio).
+  oprit:
+    runOnInit: >-
+      ffmpeg -hide_banner -loglevel warning -re -f lavfi -i testsrc=size=640x480:rate=15
+      -c:v libx264 -preset ultrafast -tune zerolatency -g 15 -an
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/oprit
+
+  # H.265/HEVC: speelt alleen als de tablet HEVC kan decoderen.
+  garage:
+    runOnInit: >-
+      ffmpeg -hide_banner -loglevel warning -re -f lavfi -i testsrc2=size=1280x720:rate=15
+      -c:v libx265 -preset ultrafast -tune zerolatency -x265-params keyint=15:log-level=error -an
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/garage
+
+  # G.711 A-law audio (zoals veel deurbellen/IP-camera's).
+  deurbel:
+    runOnInit: >-
+      ffmpeg -hide_banner -loglevel warning -re -f lavfi -i testsrc2=size=640x480:rate=15
+      -f lavfi -i sine=frequency=880:sample_rate=8000
+      -c:v libx264 -preset ultrafast -tune zerolatency -g 15 -c:a pcm_alaw -ar 8000 -ac 1
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/deurbel
+
+  # Ongecomprimeerde PCM-audio (L16).
+  schuur:
+    runOnInit: >-
+      ffmpeg -hide_banner -loglevel warning -re -f lavfi -i mandelbrot=size=640x360:rate=10
+      -f lavfi -i sine=frequency=330:sample_rate=16000
+      -c:v libx264 -preset ultrafast -tune zerolatency -g 10 -c:a pcm_s16be -ar 16000 -ac 1
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/schuur
+
+  # Lage keyframe-interval (0,5 s).
+  snel_gop:
+    runOnInit: >-
+      ffmpeg -hide_banner -loglevel warning -re -f lavfi -i testsrc2=size=640x360:rate=20
+      -c:v libx264 -preset ultrafast -tune zerolatency -g 10 -an
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/snel_gop
+
+  # Hoge keyframe-interval (10 s): eerste beeld kan tot 10 s duren (watchdog mag niet afgaan).
+  traag_gop:
+    runOnInit: >-
+      ffmpeg -hide_banner -loglevel warning -re -f lavfi -i testsrc2=size=640x360:rate=10
+      -c:v libx264 -preset ultrafast -tune zerolatency -g 100 -keyint_min 100 -sc_threshold 0 -an
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/traag_gop
+
+  # Full HD.
+  achterdeur:
+    runOnInit: >-
+      ffmpeg -hide_banner -loglevel warning -re -f lavfi -i testsrc2=size=1920x1080:rate=15
+      -c:v libx264 -preset ultrafast -tune zerolatency -g 15 -an
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/achterdeur
+
+  # Stream die in de Frigate-config niet voorkomt: verschijnt als losse camera (met _sub).
+  carport:
+    runOnInit: >-
+      ffmpeg -hide_banner -loglevel warning -re -f lavfi -i rgbtestsrc=size=640x360:rate=10
+      -c:v libx264 -preset ultrafast -tune zerolatency -g 10 -an
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/carport
+  carport_sub:
+    runOnInit: >-
+      ffmpeg -hide_banner -loglevel warning -re -f lavfi -i rgbtestsrc=size=320x180:rate=5
+      -c:v libx264 -preset ultrafast -tune zerolatency -g 5 -an
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/carport_sub

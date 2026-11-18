@@ -1,0 +1,58 @@
+# Lokale testomgeving voor FrigaStreamer, zonder echte Frigate.
+#
+#   cd testenv && docker compose up -d
+#
+# - mediamtx      : RTSP-server op :8554 (speelt de rol van go2rtc) met >= 10 testpatroonstreams
+# - cam-voordeur  : apart ffmpeg-proces voor 'voordeur' + 'voordeur_sub', zodat je deze ene
+#                   camera kunt stoppen (docker compose stop) of bevriezen (docker compose pause)
+# - frigate-mock  : bootst /api/go2rtc/streams, /api/config, /api/version en /api/login na
+#                   op :5000 (intern, zonder auth) en :8971 (met login, HTTP i.p.v. HTTPS)
+#
+# Zie README.md, sectie "Testomgeving", voor het simuleren van storingen.
+
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:1.21.4-ffmpeg
+    container_name: fs-mediamtx
+    restart: unless-stopped
+    ports:
+      - "8554:8554"
+      - "9997:9997" # MediaMTX-API (handig om paden te bekijken)
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+
+  cam-voordeur:
+    image: bluenviron/mediamtx:1.21.4-ffmpeg
+    container_name: fs-cam-voordeur
+    restart: unless-stopped
+    depends_on: [mediamtx]
+    entrypoint: ["/bin/sh", "-c"]
+    # main: H.264 1280x720 + AAC, keyframe elke seconde; sub: H.264 640x360 zonder audio.
+    command:
+      - >-
+        while true; do
+        ffmpeg -hide_banner -loglevel warning -re
+        -f lavfi -i testsrc2=size=1280x720:rate=25
+        -f lavfi -i sine=frequency=440:sample_rate=48000
+        -filter_complex "[0:v]split=2[m][s];[s]scale=640:360[sv]"
+        -map "[m]" -map 1:a -c:v libx264 -preset ultrafast -tune zerolatency -g 25 -c:a aac -b:a 64k
+        -f rtsp -rtsp_transport tcp rtsp://mediamtx:8554/voordeur
+        -map "[sv]" -c:v libx264 -preset ultrafast -tune zerolatency -g 25 -an
+        -f rtsp -rtsp_transport tcp rtsp://mediamtx:8554/voordeur_sub;
+        sleep 2; done
+
+  frigate-mock:
+    image: python:3.12-alpine
+    container_name: fs-frigate-mock
+    restart: unless-stopped
+    depends_on: [mediamtx]
+    ports:
+      - "5000:5000"
+      - "8971:8971"
+    volumes:
+      - ./mock:/mock:ro
+    environment:
+      MEDIAMTX_API: http://mediamtx:9997
+      MOCK_USER: admin
+      MOCK_PASSWORD: admin
+    command: ["python", "-u", "/mock/frigate_mock.py"]
