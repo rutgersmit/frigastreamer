@@ -95,12 +95,12 @@ class ExoStreamPlayer(
                         videoMime = f.sampleMimeType
                         width = f.width
                         height = f.height
-                        if (group.isSupported) videoSupported = true
+                        if (group.isSupported(/* allowExceedsCapabilities = */ true)) videoSupported = true
                     }
                     C.TRACK_TYPE_AUDIO -> {
                         hasAudio = true
                         audioMime = group.getTrackFormat(0).sampleMimeType
-                        if (group.isSupported) audioSupported = true
+                        if (group.isSupported(/* allowExceedsCapabilities = */ true)) audioSupported = true
                     }
                     else -> Unit
                 }
