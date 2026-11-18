@@ -1,12 +1,12 @@
-"""Minimale Frigate-API-mock voor de FrigaStreamer-testomgeving (alleen standaardbibliotheek).
+"""Minimal Frigate API mock for the FrigaStreamer test environment (standard library only).
 
-Poort 5000: interne API zonder authenticatie.
-Poort 8971: 'geauthenticeerde' API (HTTP i.p.v. HTTPS, zet in de app 'HTTPS gebruiken' uit).
-            POST /api/login met {"user","password"} geeft cookie frigate_token; tokens verlopen
-            na TOKEN_TTL seconden zodat het automatisch opnieuw inloggen te testen is.
+Port 5000: internal API without authentication.
+Port 8971: 'authenticated' API (HTTP instead of HTTPS; turn off 'Use HTTPS' in the app).
+           POST /api/login with {"user","password"} returns cookie frigate_token; tokens expire
+           after TOKEN_TTL seconds so automatically logging in again can be tested.
 
-/api/go2rtc/streams wordt live afgeleid van de paden die MediaMTX op dat moment heeft (zoals
-go2rtc alleen bestaande streams toont), met een vaste lijst als terugval.
+/api/go2rtc/streams is derived live from the paths MediaMTX has at that moment (just as
+go2rtc only shows existing streams), with a fixed list as fallback.
 """
 import json
 import os
@@ -31,10 +31,10 @@ def stream_names():
     try:
         with urllib.request.urlopen(MEDIAMTX_API + "/v3/paths/list?itemsPerPage=1000", timeout=2) as r:
             items = json.load(r).get("items", [])
-            # Net als go2rtc: alle geconfigureerde streams, ook als de bron (camera) even weg is.
+            # Just like go2rtc: all configured streams, even if the source (camera) is briefly gone.
             return sorted(i["name"] for i in items)
-    except Exception as e:  # MediaMTX onbereikbaar: gedraag je als go2rtc zonder streams
-        print("mediamtx api niet bereikbaar:", e)
+    except Exception as e:  # MediaMTX unreachable: behave like go2rtc without streams
+        print("mediamtx api not reachable:", e)
         return []
 
 
@@ -104,5 +104,5 @@ def serve(port, handler):
 
 if __name__ == "__main__":
     threading.Thread(target=serve, args=(8971, AuthHandler), daemon=True).start()
-    print("frigate-mock: :5000 (intern) en :8971 (login %s)" % USER)
+    print("frigate-mock: :5000 (internal) and :8971 (login %s)" % USER)
     serve(5000, Handler)

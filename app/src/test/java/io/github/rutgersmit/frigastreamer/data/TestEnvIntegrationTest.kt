@@ -64,7 +64,7 @@ class TestEnvIntegrationTest {
         }
 
         try {
-            client(ok.copy(apiPassword = "fout")).fetchStreamNames()
+            client(ok.copy(apiPassword = "wrong")).fetchStreamNames()
             fail("verwacht FrigateApiException")
         } catch (e: FrigateApiException) {
             assertEquals(401, e.httpStatus)

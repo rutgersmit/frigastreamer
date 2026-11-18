@@ -100,7 +100,7 @@ class StreamMapperTest {
         assertEquals("x", p.mainNameFor("x_sub"))
         assertNull(p.mainNameFor("_sub"))
         assertNull(p.mainNameFor("x"))
-        assertEquals(SubstreamPattern.DEFAULT, SubstreamPattern("zonder-token").pattern)
+        assertEquals(SubstreamPattern.DEFAULT, SubstreamPattern("no-token").pattern)
         assertEquals("pre_<camera>", SubstreamPattern("pre_{camera}").pattern)
         assertEquals("y", SubstreamPattern("pre_{camera}").mainNameFor("pre_y"))
     }

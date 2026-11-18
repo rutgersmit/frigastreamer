@@ -1,14 +1,14 @@
-# Lokale testomgeving voor FrigaStreamer, zonder echte Frigate.
+# Local test environment for FrigaStreamer, without a real Frigate.
 #
 #   cd testenv && docker compose up -d
 #
-# - mediamtx      : RTSP-server op :8554 (speelt de rol van go2rtc) met >= 10 testpatroonstreams
-# - cam-front-door  : apart ffmpeg-proces voor 'front_door' + 'front_door_sub', zodat je deze ene
-#                   camera kunt stoppen (docker compose stop) of bevriezen (docker compose pause)
-# - frigate-mock  : bootst /api/go2rtc/streams, /api/config, /api/version en /api/login na
-#                   op :5000 (intern, zonder auth) en :8971 (met login, HTTP i.p.v. HTTPS)
+# - mediamtx       : RTSP server on :8554 (plays the role of go2rtc) with >= 10 test pattern streams
+# - cam-front-door : separate ffmpeg process for 'front_door' + 'front_door_sub', so you can stop
+#                    (docker compose stop) or freeze (docker compose pause) this one camera
+# - frigate-mock   : mimics /api/go2rtc/streams, /api/config, /api/version and /api/login
+#                    on :5000 (internal, no auth) and :8971 (with login, HTTP instead of HTTPS)
 #
-# Zie README.md, sectie "Testomgeving", voor het simuleren van storingen.
+# See README.md, section "Test environment", for simulating failures.
 
 services:
   mediamtx:
@@ -17,7 +17,7 @@ services:
     restart: unless-stopped
     ports:
       - "8554:8554"
-      - "9997:9997" # MediaMTX-API (handig om paden te bekijken)
+      - "9997:9997" # MediaMTX API (handy for inspecting paths)
     volumes:
       - ./mediamtx.yml:/mediamtx.yml:ro
 
@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
     depends_on: [mediamtx]
     entrypoint: ["/bin/sh", "-c"]
-    # main: H.264 1280x720 + AAC, keyframe elke seconde; sub: H.264 640x360 zonder audio.
+    # main: H.264 1280x720 + AAC, keyframe every second; sub: H.264 640x360 without audio.
     command:
       - >-
         while true; do
