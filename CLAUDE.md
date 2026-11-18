@@ -17,7 +17,7 @@ Details live in [README.md](README.md) (setup, Frigate/go2rtc, reconnect strateg
   complete Dutch translation in `values-nl/strings.xml`. No hard-coded user-visible text in Compose or
   Kotlin. `StringResourcesTest` enforces key parity. Exceptions: the debug overlay (developer
   diagnostics, English only) and technical error details from the data layer (English only).
-- **applicationId `io.github.rutgersmit.frigastreamer` must never change.** Android and Obtainium would
+- **applicationId `com.rutgersmit.frigastreamer` must never change.** Android and Obtainium would
   treat a new id as a different app and updates would break.
 - MIT licensed. No Google Play Services, no analytics/trackers/ads, no cloud services in the app.
 - Credentials may be stored in DataStore, but must **never** be logged. Use `Redact.url` / `Redact.text`.
@@ -47,7 +47,7 @@ Details live in [README.md](README.md) (setup, Frigate/go2rtc, reconnect strateg
 - `versionCode` = `GITHUB_RUN_NUMBER`; `versionName` = tag without `v` (else `0.0.0-dev.<run>`).
 - Users install and update via Obtainium (public repo, no token needed).
 
-## Architecture map (`app/src/main/java/io/github/rutgersmit/frigastreamer/`)
+## Architecture map (`app/src/main/java/com/rutgersmit/frigastreamer/`)
 
 - `data/` Frigate API client (internal :5000 / authenticated :8971 with JWT cookie), JSON parsing,
   `CameraRepository` (camera list + cache of the last known list).
@@ -75,7 +75,7 @@ Details live in [README.md](README.md) (setup, Frigate/go2rtc, reconnect strateg
 ## Testing
 
 1. **Unit tests** (`app/src/test/`): fakes for player, server, clock and network live in
-   `app/src/test/java/io/github/rutgersmit/frigastreamer/fakes/Fakes.kt`; use `kotlinx-coroutines-test`
+   `app/src/test/java/com/rutgersmit/frigastreamer/fakes/Fakes.kt`; use `kotlinx-coroutines-test`
    virtual time. Real-world scenarios are in `stream/ScenarioTest.kt`. Add a test with every behaviour change.
 2. **Test environment** (`testenv/`): `docker compose up -d` starts MediaMTX + test streams + a Frigate API
    mock. Opt-in integration test: `FS_TESTENV_HOST=127.0.0.1 ./gradlew testDebugUnitTest --tests '*TestEnvIntegrationTest*'`.

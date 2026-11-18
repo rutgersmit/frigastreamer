@@ -52,7 +52,7 @@ Reliability comes before extra features.
 
 ```
 .github/workflows/build.yml   CI: unit tests, (signed) build, artifact, release on tag v*
-app/src/main/java/io/github/rutgersmit/frigastreamer/
+app/src/main/java/com/rutgersmit/frigastreamer/
   data/        Frigate API client (login/JWT), JSON parsing, CameraRepository (cache)
   domain/      Models and pure logic: backoff, player window, error classification,
                stream↔camera mapping, building the camera list
@@ -145,7 +145,7 @@ powershell -ExecutionPolicy Bypass -File scripts\install.ps1
 
 The scripts check `gh` and `adb`, download the APK with `gh release download`, install it with
 `adb install -r` on all connected devices, launch the app and print clear error messages
-(e.g. on `INSTALL_FAILED_UPDATE_INCOMPATIBLE`: different key → first `adb uninstall io.github.rutgersmit.frigastreamer`).
+(e.g. on `INSTALL_FAILED_UPDATE_INCOMPATIBLE`: different key → first `adb uninstall com.rutgersmit.frigastreamer`).
 Outside a checkout they default to `rutgersmit/frigastreamer`; set `REPO=owner/repo` (or `-Repo`) for a fork.
 
 **USB:** on the tablet, enable *Developer options → USB debugging* (unlock developer options by tapping
@@ -285,7 +285,7 @@ export ANDROID_HOME=/path/to/android-sdk
 ./gradlew testDebugUnitTest assembleDebug
 ```
 
-The debug APK (`app/build/outputs/apk/debug/app-debug.apk`) has package `io.github.rutgersmit.frigastreamer.debug`
+The debug APK (`app/build/outputs/apk/debug/app-debug.apk`) has package `com.rutgersmit.frigastreamer.debug`
 and can be installed next to the release version. A local release build requires the signing variables
 `SIGNING_KEYSTORE_PATH`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS` and `SIGNING_KEY_PASSWORD`.
 
@@ -472,7 +472,7 @@ reboot (or when pressing the home button) Android then always starts it automati
 Via ADB:
 
 ```bash
-adb shell cmd package set-home-activity io.github.rutgersmit.frigastreamer/.ui.MainActivity
+adb shell cmd package set-home-activity com.rutgersmit.frigastreamer/.ui.MainActivity
 ```
 
 **Undo:** the same button in the app settings, or choose another launcher under Android *Home app*.
@@ -487,7 +487,7 @@ adb shell cmd package set-home-activity com.google.android.apps.nexuslauncher/.N
 ```
 
 If you can no longer get out of the app (settings are always reachable via long-press or the gear icon),
-the ADB command above also works, or uninstall the app with `adb uninstall io.github.rutgersmit.frigastreamer`.
+the ADB command above also works, or uninstall the app with `adb uninstall com.rutgersmit.frigastreamer`.
 
 **Why no `BOOT_COMPLETED` receiver?** It would only work with the special permission
 `SYSTEM_ALERT_WINDOW` (granted via ADB), and the behaviour differs per manufacturer and Android version.
@@ -542,7 +542,7 @@ adb logcat -v time '*:S' FS.Manager:V FS.Net:V 'FS.Cam.front_door:V'
 adb logcat -v time | grep -E "watchdog_triggered|reconnect_scheduled|codec_error|player_(created|released)"
 ```
 
-Check memory: `adb shell dumpsys meminfo io.github.rutgersmit.frigastreamer`.
+Check memory: `adb shell dumpsys meminfo com.rutgersmit.frigastreamer`.
 
 ## Test environment (`testenv/`) and simulating failures
 
@@ -637,7 +637,7 @@ Simulate Wi-Fi interruptions on the tablet itself (Wi-Fi off/on).
 | No sound | Unmuted? With *audio codec not supported*: `#audio=aac` in go2rtc. |
 | Active camera does not start, neighbours do | Decoder limit: set the preload window to 0 or 1, or use substreams. The debug overlay shows *AUTO-REDUCED*. |
 | Login fails (8971) | Check username/password and the HTTPS setting. |
-| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | The installed app is signed with a different key: once `adb uninstall io.github.rutgersmit.frigastreamer`. |
+| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | The installed app is signed with a different key: once `adb uninstall com.rutgersmit.frigastreamer`. |
 | Release workflow fails with *signing is missing* | Set the four GitHub Secrets (see [One-time setup](#one-time-setup-keystore-and-github-secrets-also-for-forks)). |
 | Obtainium finds no release | Is there a release (not just a tag)? Hit the GitHub API rate limit? Add an optional token in Obtainium. |
 

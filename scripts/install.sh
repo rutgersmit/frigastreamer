@@ -7,8 +7,8 @@
 #   REPO=owner/repo ./scripts/install.sh # a fork
 set -euo pipefail
 
-PACKAGE="io.github.rutgersmit.frigastreamer"
-ACTIVITY="io.github.rutgersmit.frigastreamer/.ui.MainActivity"
+PACKAGE="com.rutgersmit.frigastreamer"
+ACTIVITY="com.rutgersmit.frigastreamer/.ui.MainActivity"
 TAG="${1:-}"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }

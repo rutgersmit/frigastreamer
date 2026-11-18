@@ -113,7 +113,7 @@ camera. logcat: `FS.App event=app_start`, `ON_START`. Undo: same button → choo
 2. Measure at the start, after 1 hour and at the end:
 
    ```bash
-   adb shell dumpsys meminfo io.github.rutgersmit.frigastreamer | grep -E "TOTAL PSS|TOTAL RSS|Native Heap|Java Heap|Views:|Activities:"
+   adb shell dumpsys meminfo com.rutgersmit.frigastreamer | grep -E "TOTAL PSS|TOTAL RSS|Native Heap|Java Heap|Views:|Activities:"
    ```
 
 Expected: after the warm-up phase no steady growth of *TOTAL PSS* / *Native Heap* (a few MB of fluctuation

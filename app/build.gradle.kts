@@ -24,11 +24,11 @@ val hasReleaseSigning: Boolean = keystorePath != null &&
     !System.getenv("SIGNING_KEY_PASSWORD").isNullOrBlank()
 
 android {
-    namespace = "io.github.rutgersmit.frigastreamer"
+    namespace = "com.rutgersmit.frigastreamer"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "io.github.rutgersmit.frigastreamer"
+        applicationId = "com.rutgersmit.frigastreamer"
         minSdk = 26
         targetSdk = 37
         versionCode = ciRunNumber
