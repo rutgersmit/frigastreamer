@@ -9,26 +9,26 @@ import kotlinx.serialization.json.contentOrNull
 import io.github.rutgersmit.frigastreamer.domain.FrigateCameraConfig
 import io.github.rutgersmit.frigastreamer.domain.InputRef
 
-/** Parsen van Frigate/go2rtc-JSON. Pure Kotlin, dus in JVM-unit-tests te testen. */
+/** Parsing of Frigate/go2rtc JSON. Pure Kotlin, so testable in JVM unit tests. */
 object FrigateJson {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    /** Verwijzing naar de lokale go2rtc-restream, bv. `rtsp://127.0.0.1:8554/voordeur?video=copy`. */
+    /** Reference to the local go2rtc restream, e.g. `rtsp://127.0.0.1:8554/front_door?video=copy`. */
     private val go2rtcPath = Regex(
         """^rtsp://(?:[^@/]*@)?(?:127\.0\.0\.1|localhost|0\.0\.0\.0|\[::1]):8554/([^?#/]+)""",
         RegexOption.IGNORE_CASE,
     )
 
-    /** `/api/go2rtc/streams` geeft een object met de streamnamen als keys. */
+    /** `/api/go2rtc/streams` returns an object with the stream names as keys. */
     fun parseStreamNames(body: String): List<String> {
         val root = json.parseToJsonElement(body)
-        require(root is JsonObject) { "verwacht een JSON-object van /api/go2rtc/streams" }
+        require(root is JsonObject) { "expected a JSON object from /api/go2rtc/streams" }
         return root.keys.toList()
     }
 
     fun parseCameras(body: String): List<FrigateCameraConfig> {
         val root = json.parseToJsonElement(body)
-        require(root is JsonObject) { "verwacht een JSON-object van /api/config" }
+        require(root is JsonObject) { "expected a JSON object from /api/config" }
         val cameras = root["cameras"] as? JsonObject ?: return emptyList()
         return cameras.map { (name, el) ->
             val cam = el as? JsonObject ?: JsonObject(emptyMap())

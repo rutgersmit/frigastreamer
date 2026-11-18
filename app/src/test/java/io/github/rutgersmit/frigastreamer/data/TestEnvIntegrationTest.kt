@@ -14,14 +14,14 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 /**
- * Integratietest tegen de testomgeving in `testenv/` (MediaMTX + Frigate-mock).
- * Draait alleen als FS_TESTENV_HOST gezet is, bv.:
+ * Integration test against the test environment in `testenv/` (MediaMTX + Frigate mock).
+ * Only runs when FS_TESTENV_HOST is set, e.g.:
  *
  *   cd testenv && docker compose up -d
  *   FS_TESTENV_HOST=127.0.0.1 ./gradlew testDebugUnitTest --tests '*TestEnvIntegrationTest*'
  *
- * Met FS_TESTENV_TOKEN_TTL=<s> (gelijk aan TOKEN_TTL van de mock) wordt ook het automatisch
- * opnieuw inloggen na het verlopen van de JWT getest.
+ * With FS_TESTENV_TOKEN_TTL=<s> (equal to the mock's TOKEN_TTL), automatically logging in
+ * again after the JWT expires is tested as well.
  */
 class TestEnvIntegrationTest {
     private val host: String? = System.getenv("FS_TESTENV_HOST")
@@ -29,37 +29,37 @@ class TestEnvIntegrationTest {
     private fun client(s: AppSettings, log: RecordingLogger = RecordingLogger()) = FrigateClient({ s }, log)
 
     @Test
-    fun `automatische cameralijst uit go2rtc-streams en config`() = runBlocking {
-        assumeTrue("FS_TESTENV_HOST niet gezet", host != null)
+    fun `automatic camera list from go2rtc streams and config`() = runBlocking {
+        assumeTrue("FS_TESTENV_HOST not set", host != null)
         val c = client(AppSettings(host = host!!))
         val streams = c.fetchStreamNames()
-        assertTrue("minimaal 10 streams: $streams", streams.size >= 10)
+        assertTrue("at least 10 streams: $streams", streams.size >= 10)
         val result = StreamMapper.map(streams, FrigateJson.parseCameras(c.fetchConfigBody()), SubstreamPattern(SubstreamPattern.DEFAULT))
         val byName = result.cameras.associateBy { it.name }
-        assertEquals(AutoCamera("voordeur", "voordeur", "voordeur_sub"), byName["voordeur"])
-        assertEquals(AutoCamera("tuin", "tuin", "tuin_sub"), byName["tuin"])
-        assertEquals(AutoCamera("voorkant_deurbel", "deurbel", null), byName["voorkant_deurbel"])
-        assertEquals("losse stream met eigen substream", AutoCamera("carport", "carport", "carport_sub"), byName["carport"])
-        assertEquals(setOf("zolder", "oude_camera"), result.unmatched.map { it.name }.toSet())
+        assertEquals(AutoCamera("front_door", "front_door", "front_door_sub"), byName["front_door"])
+        assertEquals(AutoCamera("garden", "garden", "garden_sub"), byName["garden"])
+        assertEquals(AutoCamera("front_doorbell", "doorbell", null), byName["front_doorbell"])
+        assertEquals("standalone stream with its own substream", AutoCamera("carport", "carport", "carport_sub"), byName["carport"])
+        assertEquals(setOf("attic", "old_camera"), result.unmatched.map { it.name }.toSet())
         assertTrue(c.probeRtsp())
-        println("testenv: ${result.cameras.size} camera's: " + result.cameras.joinToString { "${it.name}(${it.mainStream}/${it.subStream ?: "-"})" })
+        println("testenv: ${result.cameras.size} cameras: " + result.cameras.joinToString { "${it.name}(${it.mainStream}/${it.subStream ?: "-"})" })
     }
 
     @Test
-    fun `geauthenticeerde modus - login, cookie en foutief wachtwoord`() = runBlocking {
-        assumeTrue("FS_TESTENV_HOST niet gezet", host != null)
+    fun `authenticated mode - login, cookie and wrong password`() = runBlocking {
+        assumeTrue("FS_TESTENV_HOST not set", host != null)
         val ok = AppSettings(host = host!!, apiMode = ApiMode.AUTHENTICATED, apiPort = 8971, apiHttps = false, apiUsername = "admin", apiPassword = "admin")
         val log = RecordingLogger()
         val c = client(ok, log)
         assertTrue(c.fetchStreamNames().isNotEmpty())
         assertEquals(1, log.count("login_ok"))
-        assertTrue("geen wachtwoord/token in logs", log.lines.none { it.contains("admin\"") || it.contains("frigate_token=") })
+        assertTrue("no password/token in logs", log.lines.none { it.contains("admin\"") || it.contains("frigate_token=") })
 
         val ttl = System.getenv("FS_TESTENV_TOKEN_TTL")?.toLongOrNull()
         if (ttl != null) {
             Thread.sleep((ttl + 1) * 1000)
             assertTrue(c.fetchStreamNames().isNotEmpty())
-            assertEquals("na 401 automatisch opnieuw ingelogd", 1, log.count("token_expired"))
+            assertEquals("logged in again automatically after 401", 1, log.count("token_expired"))
             assertEquals(2, log.count("login_ok"))
         }
 
@@ -72,13 +72,13 @@ class TestEnvIntegrationTest {
     }
 
     @Test
-    fun `onbereikbare API geeft een nette fout`() = runBlocking {
-        assumeTrue("FS_TESTENV_HOST niet gezet", host != null)
+    fun `unreachable API gives a clean error`() = runBlocking {
+        assumeTrue("FS_TESTENV_HOST not set", host != null)
         try {
             client(AppSettings(host = host!!, apiPort = 5999)).fetchStreamNames()
             fail("verwacht FrigateApiException")
         } catch (e: FrigateApiException) {
-            assertTrue(e.message!!.contains("niet bereikbaar"))
+            assertTrue(e.message!!.contains("not reachable"))
         }
     }
 }

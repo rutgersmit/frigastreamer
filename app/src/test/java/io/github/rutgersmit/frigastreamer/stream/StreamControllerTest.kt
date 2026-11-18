@@ -68,7 +68,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `verbinden en afspelen`() = runTest {
+    fun `connect and play`() = runTest {
         val h = Harness(this)
         val c = h.controller()
         c.attach(PlayerRole.ACTIVE)
@@ -82,7 +82,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `exponential backoff 1-2-4-8-16-30-30 en onbeperkt doorgaan`() = runTest {
+    fun `exponential backoff 1-2-4-8-16-30-30 and keeps going indefinitely`() = runTest {
         val h = Harness(this)
         h.server.up = false
         val c = h.controller()
@@ -90,30 +90,30 @@ class StreamControllerTest {
         advance(10 * 60_000)
         val delays = h.scheduledDelays()
         assertEquals(listOf(1_000L, 2_000L, 4_000L, 8_000L, 16_000L, 30_000L, 30_000L), delays.take(7))
-        assertTrue("blijft proberen: ${delays.size}", delays.size > 20)
+        assertTrue("keeps retrying: ${delays.size}", delays.size > 20)
         assertTrue(delays.drop(5).all { it == 30_000L })
         assertTrue(c.status.value.state is StreamState.Offline)
         assertEquals(1, h.factory.live.size)
     }
 
     @Test
-    fun `backoff reset na stabiele verbinding, niet na kortstondige`() = runTest {
+    fun `backoff resets after a stable connection, not after a brief one`() = runTest {
         val h = Harness(this)
         h.server.up = false
         val c = h.controller()
         c.attach(PlayerRole.ACTIVE)
-        advance(20_000) // pogingen 1..4 ingepland (1+2+4+8 = 15 s + connect-pogingen)
+        advance(20_000) // attempts 1..4 scheduled (1+2+4+8 = 15 s + connect attempts)
         val before = h.scheduledDelays().size
         assertTrue(before >= 4)
         h.server.up = true
         advance(20_000)
         assertEquals(StreamState.Playing, c.status.value.state)
-        // Kortstondig herstel: valt binnen 10 s weer weg -> backoff loopt door.
+        // Brief recovery: drops again within 10 s -> backoff keeps growing.
         h.server.up = false
         advance(1_500)
         val afterShort = h.scheduledDelays().last()
-        assertTrue("backoff liep door: $afterShort", afterShort > 1_000L)
-        // Nu lang stabiel: daarna begint de backoff weer bij 1 s.
+        assertTrue("backoff kept growing: $afterShort", afterShort > 1_000L)
+        // Now stable for a long time: afterwards the backoff starts at 1 s again.
         h.server.up = true
         advance(60_000)
         assertEquals(StreamState.Playing, c.status.value.state)
@@ -124,7 +124,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `offline-drempel van 20 seconden, daarna herstel`() = runTest {
+    fun `offline threshold of 20 seconds, then recovery`() = runTest {
         val h = Harness(this)
         val c = h.controller()
         c.attach(PlayerRole.ACTIVE)
@@ -133,10 +133,10 @@ class StreamControllerTest {
         h.server.up = false
         advance(5_000)
         val s1 = c.status.value.state
-        assertTrue("kort: Reconnecting/Connecting, was $s1", s1 is StreamState.Reconnecting || s1 is StreamState.Connecting)
-        advance(17_000) // > 20 s sinds de storing
+        assertTrue("short: Reconnecting/Connecting, was $s1", s1 is StreamState.Reconnecting || s1 is StreamState.Connecting)
+        advance(17_000) // > 20 s since the outage
         val s2 = c.status.value.state
-        assertTrue("lang: Offline, was $s2", s2 is StreamState.Offline)
+        assertTrue("long: Offline, was $s2", s2 is StreamState.Offline)
         assertNotNull(c.status.value.lastFrameWallMs)
         h.server.up = true
         advance(31_000)
@@ -145,7 +145,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `offline-drempel is instelbaar`() = runTest {
+    fun `offline threshold is configurable`() = runTest {
         val h = Harness(this, RecoveryConfig(offlineThresholdMs = 5_000))
         h.server.up = false
         val c = h.controller()
@@ -157,7 +157,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `watchdog herstart stream als frames stoppen terwijl verbinding open blijft`() = runTest {
+    fun `watchdog restarts stream when frames stop while connection stays open`() = runTest {
         val h = Harness(this)
         val c = h.controller()
         c.attach(PlayerRole.ACTIVE)
@@ -165,7 +165,7 @@ class StreamControllerTest {
         assertEquals(StreamState.Playing, c.status.value.state)
         h.server.frozen += "cam1"
         advance(4_400)
-        assertEquals("nog binnen 5 s", StreamState.Playing, c.status.value.state)
+        assertEquals("still within 5 s", StreamState.Playing, c.status.value.state)
         advance(1_000)
         assertEquals(1, h.log.count("watchdog_triggered"))
         assertEquals(ErrorCategory.STALLED, c.status.value.lastError)
@@ -176,7 +176,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `watchdog geeft geen onterechte herstart tijdens verbindingsopbouw (keyframe-interval 10 s)`() = runTest {
+    fun `watchdog does not falsely restart during connection setup (keyframe interval 10 s)`() = runTest {
         val h = Harness(this)
         h.server.connectDelayMs = 11_000
         val c = h.controller()
@@ -190,7 +190,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `watchdog uit betekent geen stall-detectie`() = runTest {
+    fun `watchdog off means no stall detection`() = runTest {
         val h = Harness(this, RecoveryConfig(watchdogEnabled = false))
         val c = h.controller()
         c.attach(PlayerRole.ACTIVE)
@@ -201,7 +201,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `connect-timeout als er nooit een frame komt`() = runTest {
+    fun `connect timeout when no frame ever arrives`() = runTest {
         val h = Harness(this)
         h.server.connectDelayMs = 60_000
         val c = h.controller()
@@ -212,7 +212,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `netwerkverlies annuleert reconnect-timer, herstel verbindt direct`() = runTest {
+    fun `network loss cancels reconnect timer, recovery connects immediately`() = runTest {
         val h = Harness(this)
         h.server.up = false
         val c = h.controller()
@@ -224,18 +224,18 @@ class StreamControllerTest {
         assertTrue(c.status.value.waitingForNetwork)
         val starts = h.totalStarts()
         advance(120_000)
-        assertEquals("geen pogingen zonder netwerk", starts, h.totalStarts())
+        assertEquals("no attempts without network", starts, h.totalStarts())
         val st = c.status.value.state
         assertTrue(st is StreamState.Offline && st.nextAttemptAtMs == null)
         h.server.up = true
         c.onNetworkChanged(true)
-        assertEquals("direct opnieuw verbinden", starts + 1, h.totalStarts())
+        assertEquals("reconnect immediately", starts + 1, h.totalStarts())
         advance(400)
         assertEquals(StreamState.Playing, c.status.value.state)
     }
 
     @Test
-    fun `nooit meer dan een reconnect-timer, late callbacks van oude sessie genegeerd`() = runTest {
+    fun `never more than one reconnect timer, late callbacks from old session ignored`() = runTest {
         val h = Harness(this)
         val c = h.controller()
         c.attach(PlayerRole.ACTIVE)
@@ -243,22 +243,22 @@ class StreamControllerTest {
         val p = h.factory.created.single() as FakeStreamPlayer
         val oldListener = p.currentListener!!
         h.server.up = false
-        advance(1_200) // fout gedetecteerd, reconnect ingepland
+        advance(1_200) // error detected, reconnect scheduled
         assertTrue(c.hasPendingReconnect)
         val scheduled = h.scheduledDelays().size
-        // Dubbele foutmeldingen (oude sessie / dubbele callback) mogen niets extra's inplannen.
+        // Duplicate error reports (old session / duplicate callback) must not schedule anything extra.
         oldListener.onFailure(PlayerFailure(ErrorCategory.NETWORK, "dubbel"))
         oldListener.onFailure(PlayerFailure(ErrorCategory.STALLED, "dubbel"))
         assertEquals(scheduled, h.scheduledDelays().size)
         h.server.up = true
-        advance(1_000) // reconnect uitgevoerd -> nieuwe sessie
+        advance(1_000) // reconnect executed -> new session
         oldListener.onFailure(PlayerFailure(ErrorCategory.NETWORK, "oude sessie"))
         assertEquals(scheduled, h.scheduledDelays().size)
         assertEquals(1, h.factory.live.size)
     }
 
     @Test
-    fun `niet-ondersteunde videocodec geeft Error en geen reconnect-loop`() = runTest {
+    fun `unsupported video codec gives Error and no reconnect loop`() = runTest {
         val h = Harness(this)
         h.server.failures["cam1"] = ErrorCategory.UNSUPPORTED_VIDEO_CODEC
         val c = h.controller()
@@ -267,9 +267,9 @@ class StreamControllerTest {
         val st = c.status.value.state
         assertTrue(st is StreamState.Error && st.category == ErrorCategory.UNSUPPORTED_VIDEO_CODEC)
         assertEquals(1, h.totalStarts())
-        assertEquals("decoder vrijgegeven", 0, h.factory.live.size)
+        assertEquals("decoder released", 0, h.factory.live.size)
         assertEquals(0, h.scheduledDelays().size)
-        // Handmatig opnieuw proberen kan wel.
+        // Retrying manually is still possible.
         h.server.failures.clear()
         c.retry()
         advance(500)
@@ -277,7 +277,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `RTSP-authenticatiefout is permanent`() = runTest {
+    fun `RTSP authentication failure is permanent`() = runTest {
         val h = Harness(this)
         h.server.failures["cam1"] = ErrorCategory.RTSP_AUTH
         val c = h.controller()
@@ -288,7 +288,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `herhaalde decoderfouten zonder beeld worden een permanente codecfout`() = runTest {
+    fun `repeated decoder errors without video become a permanent codec error`() = runTest {
         val h = Harness(this)
         h.server.failures["cam1"] = ErrorCategory.DECODING
         val c = h.controller()
@@ -300,7 +300,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `niet-ondersteunde audio - video blijft werken zonder audiotrack`() = runTest {
+    fun `unsupported audio - video keeps working without audio track`() = runTest {
         val h = Harness(this)
         h.server.failures["cam1"] = ErrorCategory.UNSUPPORTED_AUDIO_CODEC
         val c = h.controller()
@@ -314,7 +314,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `decoder-initialisatiefout zonder andere spelers is een codecfout`() = runTest {
+    fun `decoder initialization failure without other players is a codec error`() = runTest {
         val h = Harness(this)
         h.server.maxDecoders = 0
         val c = h.controller()
@@ -327,7 +327,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `detach geeft speler vrij en stopt alle timers`() = runTest {
+    fun `detach releases player and stops all timers`() = runTest {
         val h = Harness(this)
         h.server.up = false
         val c = h.controller()
@@ -345,7 +345,7 @@ class StreamControllerTest {
     }
 
     @Test
-    fun `preload gebruikt substream en is gemute, promotie schakelt naar main`() = runTest {
+    fun `preload uses substream and is muted, promotion switches to main`() = runTest {
         val h = Harness(this)
         val c = h.controller()
         c.setMuted(false)
@@ -357,20 +357,20 @@ class StreamControllerTest {
         c.attach(PlayerRole.ACTIVE)
         assertEquals(StreamKind.MAIN, p.source!!.kind)
         assertFalse(p.muted)
-        assertEquals("zelfde spelerinstantie", 1, h.factory.created.size)
+        assertEquals("same player instance", 1, h.factory.created.size)
     }
 
     @Test
-    fun `RTSP-credentials gaan apart naar de speler, nooit in logs`() = runTest {
+    fun `RTSP credentials go to the player separately, never into logs`() = runTest {
         val h = Harness(this)
-        h.credentials = RtspCredentials("admin", "supergeheim")
+        h.credentials = RtspCredentials("admin", "supersecret")
         val c = h.controller()
         c.attach(PlayerRole.ACTIVE)
         advance(500)
         val src = h.factory.live.single().source!!
         assertEquals("admin", src.credentials!!.username)
-        assertFalse(src.url.contains("supergeheim"))
-        assertFalse(src.toString().contains("supergeheim"))
-        assertTrue(h.log.lines.none { it.contains("supergeheim") })
+        assertFalse(src.url.contains("supersecret"))
+        assertFalse(src.toString().contains("supersecret"))
+        assertTrue(h.log.lines.none { it.contains("supersecret") })
     }
 }

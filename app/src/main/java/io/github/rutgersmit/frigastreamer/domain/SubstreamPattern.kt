@@ -1,8 +1,8 @@
 package io.github.rutgersmit.frigastreamer.domain
 
 /**
- * Naampatroon voor substreams, bv. `<camera>_sub` (standaard) of `{camera}-low`.
- * Zowel `<camera>` als `{camera}` worden als placeholder herkend.
+ * Name pattern for substreams, e.g. `<camera>_sub` (default) or `{camera}-low`.
+ * Both `<camera>` and `{camera}` are recognized as placeholder.
  */
 class SubstreamPattern(raw: String) {
     val pattern: String = normalize(raw)
@@ -17,7 +17,7 @@ class SubstreamPattern(raw: String) {
 
     fun subNameFor(camera: String): String = prefix + camera + suffix
 
-    /** Geeft de cameranaam terug als [streamName] aan het patroon voldoet, anders null. */
+    /** Returns the camera name if [streamName] matches the pattern, otherwise null. */
     fun mainNameFor(streamName: String): String? {
         if (prefix.isEmpty() && suffix.isEmpty()) return null
         if (!streamName.startsWith(prefix) || !streamName.endsWith(suffix)) return null

@@ -1,21 +1,33 @@
 package io.github.rutgersmit.frigastreamer.domain
 
-/** Een go2rtc-stream die in de Frigate-config bij een camera-input hoort. */
+/** A go2rtc stream that belongs to a camera input in the Frigate config. */
 data class InputRef(val streamName: String, val roles: List<String>)
 
-/** Het relevante deel van een camera uit `/api/config`. */
+/** The relevant part of a camera from `/api/config`. */
 data class FrigateCameraConfig(
     val name: String,
     val enabled: Boolean = true,
     val inputs: List<InputRef> = emptyList(),
-    /** Streamnamen uit `live.streams` (0.16+) of `live.stream_name` (oudere versies), in volgorde. */
+    /** Stream names from `live.streams` (0.16+) or `live.stream_name` (older versions), in order. */
     val liveStreams: List<String> = emptyList(),
 )
 
-/** Een automatisch gevonden camera: namen van go2rtc-streams (geen URL's). */
+/** An automatically discovered camera: names of go2rtc streams (not URLs). */
 data class AutoCamera(val name: String, val mainStream: String, val subStream: String?)
 
-data class UnmatchedCamera(val name: String, val reason: String)
+/** Why a Frigate camera could not be mapped to a go2rtc stream. */
+enum class UnmatchReason {
+    /** The camera is disabled in Frigate (`enabled: false`). */
+    DISABLED,
+
+    /** No go2rtc stream with the camera's name, and the camera does not reference go2rtc. */
+    NO_GO2RTC_STREAM,
+
+    /** The camera references go2rtc streams, but none of them exist in go2rtc. */
+    REFERENCED_STREAMS_MISSING,
+}
+
+data class UnmatchedCamera(val name: String, val reason: UnmatchReason)
 
 data class MappingResult(
     val cameras: List<AutoCamera>,
@@ -23,17 +35,17 @@ data class MappingResult(
 )
 
 /**
- * Koppelt go2rtc-streams (bron van waarheid voor wat via RTSP bereikbaar is) aan
- * Frigate-camera's uit `/api/config`.
+ * Maps go2rtc streams (the source of truth for what is reachable over RTSP) to
+ * Frigate cameras from `/api/config`.
  *
- * Regels:
- * 1. Main stream van camera X: stream met exact de naam X; anders de eerste `live`-stream;
- *    anders de input met rol `record`; anders een andere input die naar go2rtc verwijst.
- * 2. Substream: stream volgens het substream-patroon (standaard `X_sub`); anders een input
- *    met rol `detect` die niet de main stream is; anders een andere `live`-stream.
- * 3. Streams die aan geen camera hangen worden losse camera's (met eventueel hun eigen
- *    `_sub`-variant als substream).
- * 4. Camera's zonder bijbehorende go2rtc-stream worden niet getoond maar in [MappingResult.unmatched] gemeld.
+ * Rules:
+ * 1. Main stream of camera X: the stream named exactly X; otherwise the first `live` stream;
+ *    otherwise the input with role `record`; otherwise another input that points to go2rtc.
+ * 2. Substream: the stream matching the substream pattern (default `X_sub`); otherwise an input
+ *    with role `detect` that is not the main stream; otherwise another `live` stream.
+ * 3. Streams not attached to any camera become standalone cameras (with their own
+ *    `_sub` variant as substream, if present).
+ * 4. Cameras without a matching go2rtc stream are not shown but reported in [MappingResult.unmatched].
  */
 object StreamMapper {
 
@@ -49,7 +61,7 @@ object StreamMapper {
 
         for (cam in cameras) {
             if (!cam.enabled) {
-                unmatched += UnmatchedCamera(cam.name, "camera staat uit in Frigate (enabled: false)")
+                unmatched += UnmatchedCamera(cam.name, UnmatchReason.DISABLED)
                 continue
             }
             val fromInputs = cam.inputs.filter { it.streamName in available }
@@ -61,9 +73,9 @@ object StreamMapper {
             }
             if (main == null) {
                 val reason = if (cam.inputs.isEmpty() && cam.liveStreams.isEmpty()) {
-                    "geen go2rtc-stream met naam '${cam.name}' (camera gebruikt go2rtc niet)"
+                    UnmatchReason.NO_GO2RTC_STREAM
                 } else {
-                    "geen van de gerefereerde streams bestaat in go2rtc"
+                    UnmatchReason.REFERENCED_STREAMS_MISSING
                 }
                 unmatched += UnmatchedCamera(cam.name, reason)
                 continue
@@ -78,7 +90,7 @@ object StreamMapper {
             result += AutoCamera(cam.name, main, sub)
         }
 
-        // Losse streams: niet aan een camera gekoppeld.
+        // Standalone streams: not attached to any camera.
         val loose = available.filter { it !in claimed }
         val looseSet = loose.toSet()
         val usedAsSub = HashSet<String>()

@@ -37,11 +37,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.rutgersmit.frigastreamer.BuildConfig
+import io.github.rutgersmit.frigastreamer.R
 import io.github.rutgersmit.frigastreamer.domain.CameraConfig
 import io.github.rutgersmit.frigastreamer.domain.CameraEntry
 import io.github.rutgersmit.frigastreamer.domain.CameraOverride
@@ -55,6 +57,9 @@ import io.github.rutgersmit.frigastreamer.settings.AppSettings
 import io.github.rutgersmit.frigastreamer.settings.OrientationSetting
 import io.github.rutgersmit.frigastreamer.ui.MainViewModel
 import io.github.rutgersmit.frigastreamer.ui.formatTime
+import io.github.rutgersmit.frigastreamer.ui.labelRes
+import io.github.rutgersmit.frigastreamer.ui.refreshSummary
+import io.github.rutgersmit.frigastreamer.domain.UnmatchReason
 import io.github.rutgersmit.frigastreamer.util.Redact
 import java.util.UUID
 
@@ -75,37 +80,46 @@ fun SettingsScreen(vm: MainViewModel, onClose: () -> Unit) {
     ) {
         item {
             Row(Modifier.fillMaxWidth().padding(top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Instellingen", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-                Button(onClick = onClose) { Text("Terug naar camera's") }
+                Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+                Button(onClick = onClose) { Text(stringResource(R.string.settings_back)) }
             }
-            Text("Versie ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE), style = MaterialTheme.typography.bodySmall)
         }
 
         item { FrigateSection(settings, onSave = { vm.updateSettings { _ -> it } }) }
 
         item {
-            Section("Cameralijst") {
+            Section(stringResource(R.string.section_camera_list)) {
                 val api = when (health.api) {
-                    Reach.OK -> "bereikbaar${health.version?.let { " (Frigate $it)" } ?: ""}"
-                    Reach.DOWN -> "onbereikbaar"
-                    Reach.AUTH_FAILED -> "inloggen mislukt"
-                    Reach.UNKNOWN -> "onbekend"
+                    Reach.OK -> health.version?.let { stringResource(R.string.api_reachable_version, it) }
+                        ?: stringResource(R.string.api_reachable)
+                    Reach.DOWN -> stringResource(R.string.api_unreachable)
+                    Reach.AUTH_FAILED -> stringResource(R.string.api_auth_failed)
+                    Reach.UNKNOWN -> stringResource(R.string.api_unknown)
                 }
-                Text("Frigate-API: $api · RTSP-poort: ${health.rtsp.name.lowercase()}")
+                Text(stringResource(R.string.api_status, api, health.rtsp.name.lowercase()))
+                val lastSuccess = refresh.lastSuccessWallMs?.let { " · " + stringResource(R.string.refresh_last_success, formatTime(it)) }
+                val cacheNote = if (refresh.usingCache && refresh.ok == false) " · " + stringResource(R.string.refresh_using_cache) else ""
                 Text(
-                    refresh.message + (refresh.lastSuccessWallMs?.let { " · laatst gelukt ${formatTime(it)}" } ?: "") +
-                        if (refresh.usingCache && refresh.ok == false) " · laatst bekende lijst wordt gebruikt" else "",
+                    refreshSummary(refresh) + (lastSuccess ?: "") + cacheNote,
                     style = MaterialTheme.typography.bodySmall,
                 )
                 if (refresh.unmatched.isNotEmpty()) {
-                    Text("Camera's zonder go2rtc-stream (niet getoond):", style = MaterialTheme.typography.bodySmall)
-                    refresh.unmatched.forEach { Text(" • ${it.name}: ${it.reason}", style = MaterialTheme.typography.bodySmall) }
+                    Text(stringResource(R.string.unmatched_header), style = MaterialTheme.typography.bodySmall)
+                    refresh.unmatched.forEach { u ->
+                        val reason = if (u.reason == UnmatchReason.NO_GO2RTC_STREAM) {
+                            stringResource(u.reason.labelRes(), u.name)
+                        } else {
+                            stringResource(u.reason.labelRes())
+                        }
+                        Text(" • ${u.name}: $reason", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = vm::refreshCameras, enabled = !refresh.inProgress) {
-                        Text(if (refresh.inProgress) "Bezig..." else "Cameralijst opnieuw ophalen")
+                        Text(stringResource(if (refresh.inProgress) R.string.action_busy else R.string.action_refresh_camera_list))
                     }
-                    OutlinedButton(onClick = { adding = true }) { Text("Camera handmatig toevoegen") }
+                    OutlinedButton(onClick = { adding = true }) { Text(stringResource(R.string.action_add_camera_manually)) }
                 }
             }
         }
@@ -134,9 +148,9 @@ fun SettingsScreen(vm: MainViewModel, onClose: () -> Unit) {
         item { RecoverySection(settings) { t -> vm.updateSettings(t) } }
 
         item {
-            Section("Overig") {
-                SwitchRow("Altijd gemute starten", settings.startMuted) { v -> vm.updateSettings { it.copy(startMuted = v) } }
-                Text("Schermoriëntatie")
+            Section(stringResource(R.string.section_other)) {
+                SwitchRow(stringResource(R.string.setting_start_muted), settings.startMuted) { v -> vm.updateSettings { it.copy(startMuted = v) } }
+                Text(stringResource(R.string.setting_orientation))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OrientationSetting.entries.forEach { o ->
                         FilterChip(
@@ -144,24 +158,27 @@ fun SettingsScreen(vm: MainViewModel, onClose: () -> Unit) {
                             onClick = { vm.updateSettings { it.copy(orientation = o) } },
                             label = {
                                 Text(
-                                    when (o) {
-                                        OrientationSetting.LANDSCAPE -> "Liggend"
-                                        OrientationSetting.PORTRAIT -> "Staand"
-                                        OrientationSetting.AUTO -> "Automatisch"
-                                    },
+                                    stringResource(
+                                        when (o) {
+                                            OrientationSetting.LANDSCAPE -> R.string.orientation_landscape
+                                            OrientationSetting.PORTRAIT -> R.string.orientation_portrait
+                                            OrientationSetting.AUTO -> R.string.orientation_auto
+                                        },
+                                    ),
                                 )
                             },
                         )
                     }
                 }
-                SwitchRow("Debug-overlay tonen", settings.debugOverlay) { v -> vm.updateSettings { it.copy(debugOverlay = v) } }
+                SwitchRow(stringResource(R.string.setting_debug_overlay), settings.debugOverlay) { v -> vm.updateSettings { it.copy(debugOverlay = v) } }
                 HorizontalDivider()
                 Text(
-                    if (HomeAppHelper.isDefaultHome(context)) "Deze app is nu de standaard home-app (start automatisch na reboot)."
-                    else "Kies deze app als standaard home-app om hem na een reboot automatisch te laten starten.",
+                    stringResource(
+                        if (HomeAppHelper.isDefaultHome(context)) R.string.home_app_is_default else R.string.home_app_not_default,
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                 )
-                OutlinedButton(onClick = { HomeAppHelper.openHomeSettings(context) }) { Text("Standaard home-app instellen / terugzetten") }
+                OutlinedButton(onClick = { HomeAppHelper.openHomeSettings(context) }) { Text(stringResource(R.string.action_home_app_settings)) }
             }
         }
         item { Spacer(Modifier.height(48.dp)) }
@@ -180,7 +197,7 @@ fun SettingsScreen(vm: MainViewModel, onClose: () -> Unit) {
                         cfg.withOverride(e.camera.id) { o ->
                             o.copy(
                                 name = name,
-                                // Alleen overschrijven als de gebruiker de URL echt wijzigde.
+                                // Only override when the user actually changed the URL.
                                 mainUrl = if (main == e.camera.mainUrl) o.mainUrl else main,
                                 subUrl = if (sub == e.camera.subUrl) o.subUrl else sub,
                             )
@@ -248,39 +265,39 @@ private fun FrigateSection(settings: AppSettings, onSave: (AppSettings) -> Unit)
     var rtspPass by rememberSaveable(settings.rtspPassword) { mutableStateOf(settings.rtspPassword) }
     var pattern by rememberSaveable(settings.substreamPattern) { mutableStateOf(settings.substreamPattern) }
 
-    Section("Frigate") {
-        OutlinedTextField(host, { host = it }, label = { Text("IP-adres of hostnaam (bv. 192.168.1.10)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        Text("API-modus")
+    Section(stringResource(R.string.section_frigate)) {
+        OutlinedTextField(host, { host = it }, label = { Text(stringResource(R.string.field_host)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        Text(stringResource(R.string.field_api_mode))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(mode == ApiMode.INTERNAL, onClick = {
                 mode = ApiMode.INTERNAL
                 if (apiPort == AppSettings.DEFAULT_AUTH_PORT.toString()) apiPort = AppSettings.DEFAULT_INTERNAL_PORT.toString()
-            }, label = { Text("Intern (poort 5000, geen login)") })
+            }, label = { Text(stringResource(R.string.api_mode_internal)) })
             FilterChip(mode == ApiMode.AUTHENTICATED, onClick = {
                 mode = ApiMode.AUTHENTICATED
                 if (apiPort == AppSettings.DEFAULT_INTERNAL_PORT.toString()) apiPort = AppSettings.DEFAULT_AUTH_PORT.toString()
-            }, label = { Text("Geauthenticeerd (poort 8971, login)") })
+            }, label = { Text(stringResource(R.string.api_mode_authenticated)) })
         }
-        NumberField("API-poort", apiPort) { apiPort = it }
+        NumberField(stringResource(R.string.field_api_port), apiPort) { apiPort = it }
         if (mode == ApiMode.AUTHENTICATED) {
-            SwitchRow("HTTPS gebruiken (Frigate-standaard op 8971)", https) { https = it }
-            if (https) SwitchRow("Self-signed certificaat van Frigate accepteren", trust) { trust = it }
-            OutlinedTextField(apiUser, { apiUser = it }, label = { Text("API-gebruikersnaam") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            SwitchRow(stringResource(R.string.setting_use_https), https) { https = it }
+            if (https) SwitchRow(stringResource(R.string.setting_trust_self_signed), trust) { trust = it }
+            OutlinedTextField(apiUser, { apiUser = it }, label = { Text(stringResource(R.string.field_api_username)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(
-                apiPass, { apiPass = it }, label = { Text("API-wachtwoord") }, singleLine = true,
+                apiPass, { apiPass = it }, label = { Text(stringResource(R.string.field_api_password)) }, singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth(),
             )
         }
-        NumberField("RTSP-poort (go2rtc)", rtspPort) { rtspPort = it }
-        OutlinedTextField(rtspUser, { rtspUser = it }, label = { Text("RTSP-gebruikersnaam (optioneel, go2rtc)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        NumberField(stringResource(R.string.field_rtsp_port), rtspPort) { rtspPort = it }
+        OutlinedTextField(rtspUser, { rtspUser = it }, label = { Text(stringResource(R.string.field_rtsp_username)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(
-            rtspPass, { rtspPass = it }, label = { Text("RTSP-wachtwoord") }, singleLine = true,
+            rtspPass, { rtspPass = it }, label = { Text(stringResource(R.string.field_rtsp_password)) }, singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
-            pattern, { pattern = it }, label = { Text("Substream-naampatroon (standaard ${SubstreamPattern.DEFAULT})") },
+            pattern, { pattern = it }, label = { Text(stringResource(R.string.field_substream_pattern, SubstreamPattern.DEFAULT)) },
             singleLine = true, modifier = Modifier.fillMaxWidth(),
         )
         Button(onClick = {
@@ -299,32 +316,34 @@ private fun FrigateSection(settings: AppSettings, onSave: (AppSettings) -> Unit)
                     substreamPattern = SubstreamPattern.normalize(pattern),
                 ),
             )
-        }) { Text("Opslaan en cameralijst ophalen") }
+        }) { Text(stringResource(R.string.action_save_and_refresh)) }
     }
 }
 
 @Composable
 private fun RecoverySection(settings: AppSettings, update: ((AppSettings) -> AppSettings) -> Unit) {
-    Section("Herstel") {
-        Text("Preload-venster (voorgeladen buurcamera's)")
+    Section(stringResource(R.string.section_recovery)) {
+        Text(stringResource(R.string.setting_preload_window))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             (0..2).forEach { n ->
                 FilterChip(settings.preloadWindow == n, onClick = { update { it.copy(preloadWindow = n) } }, label = {
                     Text(
-                        when (n) {
-                            0 -> "0 (alleen actief)"
-                            1 -> "1 (volgende)"
-                            else -> "2 (volgende + vorige)"
-                        },
+                        stringResource(
+                            when (n) {
+                                0 -> R.string.preload_0
+                                1 -> R.string.preload_1
+                                else -> R.string.preload_2
+                            },
+                        ),
                     )
                 })
             }
         }
-        IntSetting("Offline-drempel (seconden)", settings.offlineThresholdSec, 3..600) { v -> update { it.copy(offlineThresholdSec = v) } }
-        SwitchRow("Frame-watchdog", settings.watchdogEnabled) { v -> update { it.copy(watchdogEnabled = v) } }
-        IntSetting("Watchdog-time-out (seconden zonder nieuw frame)", settings.watchdogTimeoutSec, 2..120) { v -> update { it.copy(watchdogTimeoutSec = v) } }
-        IntSetting("Reconnect-backoff minimum (seconden)", settings.backoffMinSec, 1..60) { v -> update { it.copy(backoffMinSec = v) } }
-        IntSetting("Reconnect-backoff maximum (seconden)", settings.backoffMaxSec, 1..600) { v -> update { it.copy(backoffMaxSec = v) } }
+        IntSetting(stringResource(R.string.setting_offline_threshold), settings.offlineThresholdSec, 3..600) { v -> update { it.copy(offlineThresholdSec = v) } }
+        SwitchRow(stringResource(R.string.setting_watchdog), settings.watchdogEnabled) { v -> update { it.copy(watchdogEnabled = v) } }
+        IntSetting(stringResource(R.string.setting_watchdog_timeout), settings.watchdogTimeoutSec, 2..120) { v -> update { it.copy(watchdogTimeoutSec = v) } }
+        IntSetting(stringResource(R.string.setting_backoff_min), settings.backoffMinSec, 1..60) { v -> update { it.copy(backoffMinSec = v) } }
+        IntSetting(stringResource(R.string.setting_backoff_max), settings.backoffMaxSec, 1..600) { v -> update { it.copy(backoffMaxSec = v) } }
     }
 }
 
@@ -338,7 +357,7 @@ private fun IntSetting(label: String, value: Int, range: IntRange, onChange: (In
             onChange(v)
         }
     }
-    NumberField("$label [${range.first}-${range.last}]", text) { text = it }
+    NumberField(stringResource(R.string.setting_range, label, range.first, range.last), text) { text = it }
 }
 
 @Composable
@@ -365,10 +384,12 @@ private fun CameraRow(
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(cam.name + if (entry.hidden) " (verborgen)" else "", style = MaterialTheme.typography.titleMedium)
+                    Text(if (entry.hidden) stringResource(R.string.camera_hidden_suffix, cam.name) else cam.name, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        (if (cam.source == CameraSource.AUTO) "automatisch" else "handmatig") + " · main: " + Redact.url(cam.mainUrl) +
-                            (cam.subUrl?.let { " · sub: " + Redact.url(it) } ?: " · geen substream"),
+                        stringResource(if (cam.source == CameraSource.AUTO) R.string.camera_source_auto else R.string.camera_source_manual) +
+                            " · " + stringResource(R.string.camera_main_url, Redact.url(cam.mainUrl)) +
+                            " · " + (cam.subUrl?.let { stringResource(R.string.camera_sub_url, Redact.url(it)) }
+                                ?: stringResource(R.string.camera_no_substream)),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray,
                     )
@@ -377,14 +398,14 @@ private fun CameraRow(
                 TextButton(onClick = { onMove(1) }, enabled = canDown) { Text("▼") }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Zichtbaar")
+                Text(stringResource(R.string.camera_visible))
                 Switch(checked = !entry.hidden, onCheckedChange = { onToggleHidden(!it) })
                 Spacer(Modifier.width(8.dp))
-                Text("Substream als actief")
+                Text(stringResource(R.string.camera_prefer_sub))
                 Switch(checked = cam.preferSub, onCheckedChange = onToggleSub, enabled = cam.subUrl != null)
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onEdit) { Text("Bewerken") }
-                if (cam.source == CameraSource.MANUAL) TextButton(onClick = onDelete) { Text("Verwijderen") }
+                TextButton(onClick = onEdit) { Text(stringResource(R.string.action_edit)) }
+                if (cam.source == CameraSource.MANUAL) TextButton(onClick = onDelete) { Text(stringResource(R.string.action_delete)) }
             }
         }
     }
@@ -398,14 +419,14 @@ private fun CameraEditDialog(initial: CameraEntry?, onDismiss: () -> Unit, onSav
     var sub by remember { mutableStateOf(cam?.subUrl ?: "") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) "Camera toevoegen" else "Camera bewerken") },
+        title = { Text(stringResource(if (initial == null) R.string.dialog_add_camera else R.string.dialog_edit_camera)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("Naam") }, singleLine = true)
-                OutlinedTextField(main, { main = it }, label = { Text("RTSP-URL main stream") }, singleLine = true)
-                OutlinedTextField(sub, { sub = it }, label = { Text("RTSP-URL substream (optioneel)") }, singleLine = true)
+                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.field_name)) }, singleLine = true)
+                OutlinedTextField(main, { main = it }, label = { Text(stringResource(R.string.field_main_url)) }, singleLine = true)
+                OutlinedTextField(sub, { sub = it }, label = { Text(stringResource(R.string.field_sub_url)) }, singleLine = true)
                 if (cam?.source == CameraSource.AUTO) {
-                    Text("Laat leeg/ongewijzigd om de automatisch bepaalde URL te houden.", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.dialog_keep_auto_url), style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
@@ -413,8 +434,8 @@ private fun CameraEditDialog(initial: CameraEntry?, onDismiss: () -> Unit, onSav
             TextButton(
                 enabled = name.isNotBlank() && main.trim().startsWith("rtsp", ignoreCase = true),
                 onClick = { onSave(name.trim(), main.trim(), sub.trim().ifEmpty { null }) },
-            ) { Text("Opslaan") }
+            ) { Text(stringResource(R.string.action_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Annuleren") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }

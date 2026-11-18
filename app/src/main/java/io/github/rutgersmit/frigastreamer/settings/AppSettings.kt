@@ -12,9 +12,9 @@ data class AppSettings(
     val host: String = "",
     val apiMode: ApiMode = ApiMode.INTERNAL,
     val apiPort: Int = DEFAULT_INTERNAL_PORT,
-    /** Alleen voor de geauthenticeerde modus: Frigate gebruikt op 8971 standaard HTTPS. */
+    /** Authenticated mode only: Frigate uses HTTPS on 8971 by default. */
     val apiHttps: Boolean = true,
-    /** Accepteer het self-signed certificaat van Frigate (alleen voor deze host). */
+    /** Accept Frigate's self-signed certificate (for this host only). */
     val apiTrustSelfSigned: Boolean = true,
     val apiUsername: String = "",
     val apiPassword: String = "",

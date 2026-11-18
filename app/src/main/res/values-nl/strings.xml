@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dutch translation. Must contain every translatable key from values/strings.xml. -->
+<resources>
+    <!-- Live screen -->
+    <string name="live_not_configured">Nog geen Frigate-server ingesteld.</string>
+    <string name="live_loading_cameras">Cameralijst ophalen…</string>
+    <string name="live_no_cameras">Geen camera\'s gevonden.</string>
+    <string name="action_settings">Instellingen</string>
+    <string name="action_refresh">Opnieuw ophalen</string>
+    <string name="action_sound_on">Geluid aan</string>
+    <string name="action_sound_off">Geluid uit</string>
+
+    <!-- Camera page -->
+    <string name="status_connecting">Verbinden…</string>
+    <string name="status_camera_offline">Camera offline</string>
+    <string name="status_audio_unsupported">Geen geluid: audiocodec niet ondersteund</string>
+    <string name="error_cannot_play">Kan deze camera niet afspelen</string>
+    <string name="error_hint_codec">Tip: laat go2rtc deze stream naar H.264/AAC transcoderen, bv. ffmpeg:%1$s#video=h264#audio=aac (zie README).</string>
+    <string name="error_hint_auth">Controleer de RTSP-gebruikersnaam en het wachtwoord in de instellingen.</string>
+    <string name="error_auto_retry_disabled">Automatisch opnieuw proberen staat uit voor dit type fout.</string>
+    <string name="action_retry">Opnieuw proberen</string>
+    <string name="info_last_frame">Laatste beeld</string>
+    <string name="info_no_frame_yet">nog geen beeld ontvangen</string>
+    <string name="info_next_attempt">Volgende poging</string>
+    <string name="info_when_network_returns">zodra het netwerk terug is</string>
+    <string name="info_connecting_now">bezig met verbinden…</string>
+    <string name="info_next_attempt_in">over %1$d s (poging %2$d)</string>
+
+    <!-- Diagnosis on the offline screen -->
+    <string name="diag_no_network">Geen netwerkverbinding</string>
+    <string name="diag_frigate_unreachable">Frigate is niet bereikbaar</string>
+    <string name="diag_rtsp_unreachable">Frigate is bereikbaar, maar de RTSP-server (go2rtc) niet</string>
+    <string name="diag_stalled">Verbinding open, maar er komen geen nieuwe beelden binnen</string>
+    <string name="diag_codec">Codec- of decoderprobleem</string>
+    <string name="diag_camera_unreachable">Frigate is bereikbaar, maar deze camera niet (%1$s)</string>
+    <string name="diag_no_image">Geen beeld</string>
+
+    <!-- Error categories -->
+    <string name="err_network">Netwerkfout</string>
+    <string name="err_network_unavailable">Geen netwerkverbinding</string>
+    <string name="err_connect_timeout">Verbinding maken duurt te lang</string>
+    <string name="err_rtsp_protocol">RTSP-protocolfout</string>
+    <string name="err_rtsp_not_found">Stream niet gevonden op de RTSP-server</string>
+    <string name="err_rtsp_auth">RTSP-authenticatie mislukt</string>
+    <string name="err_stream_ended">Stream beëindigd door de server</string>
+    <string name="err_stalled">Verbinding open, maar geen nieuwe beelden</string>
+    <string name="err_unsupported_video_codec">Videocodec niet ondersteund door dit apparaat</string>
+    <string name="err_unsupported_audio_codec">Audiocodec niet ondersteund</string>
+    <string name="err_decoder_init">Videodecoder kon niet starten</string>
+    <string name="err_decoding">Decoderfout</string>
+    <string name="err_codec_permanent">Stream kan niet gedecodeerd worden</string>
+    <string name="err_unknown">Onbekende streamfout</string>
+
+    <!-- Settings: header -->
+    <string name="settings_title">Instellingen</string>
+    <string name="settings_back">Terug naar camera\'s</string>
+    <string name="settings_version">Versie %1$s (build %2$d)</string>
+
+    <!-- Settings: camera list -->
+    <string name="section_camera_list">Cameralijst</string>
+    <string name="api_reachable">bereikbaar</string>
+    <string name="api_reachable_version">bereikbaar (Frigate %1$s)</string>
+    <string name="api_unreachable">onbereikbaar</string>
+    <string name="api_auth_failed">inloggen mislukt</string>
+    <string name="api_unknown">onbekend</string>
+    <string name="api_status">Frigate-API: %1$s · RTSP-poort: %2$s</string>
+    <string name="refresh_not_fetched">Nog niet opgehaald</string>
+    <string name="refresh_not_configured">Stel eerst het IP-adres van Frigate in</string>
+    <string name="refresh_failed">Frigate-API onbereikbaar: %1$s</string>
+    <plurals name="refresh_streams">
+        <item quantity="one">%d go2rtc-stream</item>
+        <item quantity="other">%d go2rtc-streams</item>
+    </plurals>
+    <plurals name="refresh_cameras">
+        <item quantity="one">%d camera</item>
+        <item quantity="other">%d camera\'s</item>
+    </plurals>
+    <string name="refresh_config_unavailable">(config niet beschikbaar: alleen streamnamen gebruikt)</string>
+    <plurals name="refresh_unmatched">
+        <item quantity="one">%d zonder stream</item>
+        <item quantity="other">%d zonder stream</item>
+    </plurals>
+    <string name="refresh_last_success">laatst gelukt %1$s</string>
+    <string name="refresh_using_cache">laatst bekende lijst wordt gebruikt</string>
+    <string name="unmatched_header">Camera\'s zonder go2rtc-stream (niet getoond):</string>
+    <string name="unmatched_disabled">camera staat uit in Frigate (enabled: false)</string>
+    <string name="unmatched_no_stream">geen go2rtc-stream met naam \'%1$s\' (camera gebruikt go2rtc niet)</string>
+    <string name="unmatched_streams_missing">geen van de gerefereerde streams bestaat in go2rtc</string>
+    <string name="action_busy">Bezig…</string>
+    <string name="action_refresh_camera_list">Cameralijst opnieuw ophalen</string>
+    <string name="action_add_camera_manually">Camera handmatig toevoegen</string>
+
+    <!-- Settings: other -->
+    <string name="section_other">Overig</string>
+    <string name="setting_start_muted">Altijd gemute starten</string>
+    <string name="setting_orientation">Schermoriëntatie</string>
+    <string name="orientation_landscape">Liggend</string>
+    <string name="orientation_portrait">Staand</string>
+    <string name="orientation_auto">Automatisch</string>
+    <string name="setting_debug_overlay">Debug-overlay tonen</string>
+    <string name="home_app_is_default">Deze app is nu de standaard home-app (start automatisch na reboot).</string>
+    <string name="home_app_not_default">Kies deze app als standaard home-app om hem na een reboot automatisch te laten starten.</string>
+    <string name="action_home_app_settings">Standaard home-app instellen / terugzetten</string>
+
+    <!-- Settings: Frigate -->
+    <string name="section_frigate">Frigate</string>
+    <string name="field_host">IP-adres of hostnaam (bv. 192.168.1.10)</string>
+    <string name="field_api_mode">API-modus</string>
+    <string name="api_mode_internal">Intern (poort 5000, geen login)</string>
+    <string name="api_mode_authenticated">Geauthenticeerd (poort 8971, login)</string>
+    <string name="field_api_port">API-poort</string>
+    <string name="setting_use_https">HTTPS gebruiken (Frigate-standaard op 8971)</string>
+    <string name="setting_trust_self_signed">Self-signed certificaat van Frigate accepteren</string>
+    <string name="field_api_username">API-gebruikersnaam</string>
+    <string name="field_api_password">API-wachtwoord</string>
+    <string name="field_rtsp_port">RTSP-poort (go2rtc)</string>
+    <string name="field_rtsp_username">RTSP-gebruikersnaam (optioneel, go2rtc)</string>
+    <string name="field_rtsp_password">RTSP-wachtwoord</string>
+    <string name="field_substream_pattern">Substream-naampatroon (standaard %1$s)</string>
+    <string name="action_save_and_refresh">Opslaan en cameralijst ophalen</string>
+
+    <!-- Settings: recovery -->
+    <string name="section_recovery">Herstel</string>
+    <string name="setting_preload_window">Preload-venster (voorgeladen buurcamera\'s)</string>
+    <string name="preload_0">0 (alleen actief)</string>
+    <string name="preload_1">1 (volgende)</string>
+    <string name="preload_2">2 (volgende + vorige)</string>
+    <string name="setting_offline_threshold">Offline-drempel (seconden)</string>
+    <string name="setting_watchdog">Frame-watchdog</string>
+    <string name="setting_watchdog_timeout">Watchdog-time-out (seconden zonder nieuw frame)</string>
+    <string name="setting_backoff_min">Reconnect-backoff minimum (seconden)</string>
+    <string name="setting_backoff_max">Reconnect-backoff maximum (seconden)</string>
+
+    <!-- Settings: camera rows and dialog -->
+    <string name="camera_hidden_suffix">%1$s (verborgen)</string>
+    <string name="camera_source_auto">automatisch</string>
+    <string name="camera_source_manual">handmatig</string>
+    <string name="camera_main_url">main: %1$s</string>
+    <string name="camera_sub_url">sub: %1$s</string>
+    <string name="camera_no_substream">geen substream</string>
+    <string name="camera_visible">Zichtbaar</string>
+    <string name="camera_prefer_sub">Substream als actief</string>
+    <string name="action_edit">Bewerken</string>
+    <string name="action_delete">Verwijderen</string>
+    <string name="dialog_add_camera">Camera toevoegen</string>
+    <string name="dialog_edit_camera">Camera bewerken</string>
+    <string name="field_name">Naam</string>
+    <string name="field_main_url">RTSP-URL main stream</string>
+    <string name="field_sub_url">RTSP-URL substream (optioneel)</string>
+    <string name="dialog_keep_auto_url">Laat leeg/ongewijzigd om de automatisch bepaalde URL te houden.</string>
+    <string name="action_save">Opslaan</string>
+    <string name="action_cancel">Annuleren</string>
+</resources>

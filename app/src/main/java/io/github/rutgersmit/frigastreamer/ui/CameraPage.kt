@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -87,7 +88,7 @@ fun CameraPage(
         }
         if (status.audioUnsupported && !muted && status.state is StreamState.Playing) {
             Text(
-                "Geen geluid: audiocodec niet ondersteund",
+                stringResource(R.string.status_audio_unsupported),
                 color = Color.White,
                 fontSize = 13.sp,
                 modifier = Modifier
@@ -121,7 +122,7 @@ private fun ConnectingPill(modifier: Modifier) {
     ) {
         CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
         Spacer(Modifier.size(8.dp))
-        Text("Verbinden...", color = Color.White, fontSize = 14.sp)
+        Text(stringResource(R.string.status_connecting), color = Color.White, fontSize = 14.sp)
     }
 }
 
@@ -132,18 +133,25 @@ private fun OfflineScreen(camera: Camera, status: StreamStatus, st: StreamState.
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 560.dp).padding(24.dp)) {
             Text(camera.name, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
-            Text("Camera offline", color = Color(0xFFFF8A80), fontSize = 22.sp)
+            Text(stringResource(R.string.status_camera_offline), color = Color(0xFFFF8A80), fontSize = 22.sp)
             Spacer(Modifier.height(16.dp))
             Text(diagnose(camera, status, health), color = Color(0xFFDDDDDD), fontSize = 16.sp, textAlign = TextAlign.Center)
             Spacer(Modifier.height(12.dp))
             val last = status.lastFrameWallMs
-            InfoLine("Laatste beeld", if (last != null) formatTime(last) else "nog geen beeld ontvangen")
             InfoLine(
-                "Volgende poging",
+                stringResource(R.string.info_last_frame),
+                if (last != null) formatTime(last) else stringResource(R.string.info_no_frame_yet),
+            )
+            InfoLine(
+                stringResource(R.string.info_next_attempt),
                 when {
-                    status.waitingForNetwork -> "zodra het netwerk terug is"
-                    st.connectingNow -> "bezig met verbinden..."
-                    st.nextAttemptAtMs != null -> "over ${((st.nextAttemptAtMs - now).coerceAtLeast(0) + 999) / 1000} s (poging ${st.attempt + 1})"
+                    status.waitingForNetwork -> stringResource(R.string.info_when_network_returns)
+                    st.connectingNow -> stringResource(R.string.info_connecting_now)
+                    st.nextAttemptAtMs != null -> stringResource(
+                        R.string.info_next_attempt_in,
+                        (((st.nextAttemptAtMs - now).coerceAtLeast(0) + 999) / 1000).toInt(),
+                        st.attempt + 1,
+                    )
                     else -> "-"
                 },
             )
@@ -157,13 +165,12 @@ private fun ErrorScreen(camera: Camera, st: StreamState.Error, onRetry: () -> Un
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(max = 600.dp).padding(24.dp)) {
             Text(camera.name, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
-            Text("Kan deze camera niet afspelen", color = Color(0xFFFFB74D), fontSize = 20.sp)
+            Text(stringResource(R.string.error_cannot_play), color = Color(0xFFFFB74D), fontSize = 20.sp)
             Spacer(Modifier.height(12.dp))
-            Text(st.category.label, color = Color(0xFFDDDDDD), fontSize = 16.sp, textAlign = TextAlign.Center)
+            Text(stringResource(st.category.labelRes()), color = Color(0xFFDDDDDD), fontSize = 16.sp, textAlign = TextAlign.Center)
             val hint = when {
-                st.category.isCodecRelated ->
-                    "Tip: laat go2rtc deze stream naar H.264/AAC transcoderen, bv. ffmpeg:${camera.name}#video=h264#audio=aac (zie README)."
-                st.category == ErrorCategory.RTSP_AUTH -> "Controleer de RTSP-gebruikersnaam en het wachtwoord in de instellingen."
+                st.category.isCodecRelated -> stringResource(R.string.error_hint_codec, camera.name)
+                st.category == ErrorCategory.RTSP_AUTH -> stringResource(R.string.error_hint_auth)
                 else -> null
             }
             if (hint != null) {
@@ -171,9 +178,9 @@ private fun ErrorScreen(camera: Camera, st: StreamState.Error, onRetry: () -> Un
                 Text(hint, color = Color(0xFFAAAAAA), fontSize = 14.sp, textAlign = TextAlign.Center)
             }
             Spacer(Modifier.height(4.dp))
-            Text("Automatisch opnieuw proberen staat uit voor dit type fout.", color = Color(0xFF888888), fontSize = 13.sp)
+            Text(stringResource(R.string.error_auto_retry_disabled), color = Color(0xFF888888), fontSize = 13.sp)
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onRetry) { Text("Opnieuw proberen") }
+            Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
         }
     }
 }
@@ -186,18 +193,22 @@ private fun InfoLine(label: String, value: String) {
     }
 }
 
-/** Begrijpelijke oorzaak, met onderscheid Frigate / RTSP-server / camera / beeld / codec. */
+/** Understandable cause, distinguishing Frigate / RTSP server / camera / frames / codec. */
+@Composable
 fun diagnose(camera: Camera, status: StreamStatus, health: FrigateHealth): String {
     val err = status.lastError
     val frigateCamera = camera.source == CameraSource.AUTO && camera.useGlobalRtspAuth
     return when {
-        status.waitingForNetwork || err == ErrorCategory.NETWORK_UNAVAILABLE -> "Geen netwerkverbinding"
-        frigateCamera && health.api == Reach.DOWN && health.rtsp == Reach.DOWN -> "Frigate is niet bereikbaar"
-        frigateCamera && health.rtsp == Reach.DOWN -> "Frigate is bereikbaar, maar de RTSP-server (go2rtc) niet"
-        err == ErrorCategory.STALLED -> "Verbinding open, maar er komen geen nieuwe beelden binnen"
-        err != null && err.isCodecRelated -> "Codec- of decoderprobleem"
-        frigateCamera && health.rtsp == Reach.OK -> "Frigate is bereikbaar, maar deze camera niet (${err?.label?.lowercase() ?: "geen beeld"})"
-        else -> err?.label ?: "Geen beeld"
+        status.waitingForNetwork || err == ErrorCategory.NETWORK_UNAVAILABLE -> stringResource(R.string.diag_no_network)
+        frigateCamera && health.api == Reach.DOWN && health.rtsp == Reach.DOWN -> stringResource(R.string.diag_frigate_unreachable)
+        frigateCamera && health.rtsp == Reach.DOWN -> stringResource(R.string.diag_rtsp_unreachable)
+        err == ErrorCategory.STALLED -> stringResource(R.string.diag_stalled)
+        err != null && err.isCodecRelated -> stringResource(R.string.diag_codec)
+        frigateCamera && health.rtsp == Reach.OK -> stringResource(
+            R.string.diag_camera_unreachable,
+            stringResource(err?.labelRes() ?: R.string.diag_no_image).lowercase(),
+        )
+        else -> stringResource(err?.labelRes() ?: R.string.diag_no_image)
     }
 }
 

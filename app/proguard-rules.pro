@@ -1,1 +1,1 @@
-# Geen regels nodig: minify staat uit.
+# No rules needed: minify is disabled.

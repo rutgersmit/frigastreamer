@@ -25,8 +25,8 @@ import io.github.rutgersmit.frigastreamer.settings.AppSettings
 import io.github.rutgersmit.frigastreamer.stream.StreamManager
 
 /**
- * Koppelt de data-laag (instellingen, cameralijst, netwerk) aan de [StreamManager].
- * De UI doet zelf niets met reconnects of RTSP-verbindingen.
+ * Connects the data layer (settings, camera list, network) to the [StreamManager].
+ * The UI itself does nothing with reconnects or RTSP connections.
  */
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val graph = (app as FrigaApp).graph

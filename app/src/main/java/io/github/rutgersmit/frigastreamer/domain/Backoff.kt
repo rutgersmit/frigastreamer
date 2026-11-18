@@ -1,13 +1,13 @@
 package io.github.rutgersmit.frigastreamer.domain
 
 /**
- * Exponential backoff: 1 s, 2 s, 4 s, 8 s, ... tot maximaal [maxMs].
- * [attempt] is 1-gebaseerd (eerste herpoging = 1).
+ * Exponential backoff: 1 s, 2 s, 4 s, 8 s, ... up to [maxMs].
+ * [attempt] is 1-based (first retry = 1).
  */
 class Backoff(private val minMs: Long, private val maxMs: Long) {
     init {
-        require(minMs > 0) { "minMs moet > 0 zijn" }
-        require(maxMs >= minMs) { "maxMs moet >= minMs zijn" }
+        require(minMs > 0) { "minMs must be > 0" }
+        require(maxMs >= minMs) { "maxMs must be >= minMs" }
     }
 
     fun delayFor(attempt: Int): Long {

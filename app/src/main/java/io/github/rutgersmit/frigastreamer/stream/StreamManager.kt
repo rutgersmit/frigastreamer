@@ -18,16 +18,16 @@ import io.github.rutgersmit.frigastreamer.util.Clock
 import io.github.rutgersmit.frigastreamer.util.Logger
 
 /**
- * Beheert de [StreamController]s van alle camera's en het sliding window van actieve spelers.
+ * Manages the [StreamController]s of all cameras and the sliding window of active players.
  *
- * - Het venster is gebaseerd op camera-index, nooit op pager-pagina.
- * - Spelers buiten het venster worden EERST vrijgegeven, pas daarna worden nieuwe aangemaakt
- *   (belangrijk bij een beperkt aantal hardwaredecoders).
- * - De actieve camera heeft voorrang: buren worden pas voorgeladen als de actieve camera beeld
- *   heeft (of na [PRELOAD_GATE_MS]).
- * - Bij een decoder-initialisatiefout wordt het preload-venster voor de rest van de sessie verkleind.
+ * - The window is based on camera index, never on pager page.
+ * - Players outside the window are released FIRST; only then are new ones created
+ *   (important with a limited number of hardware decoders).
+ * - The active camera has priority: neighbours are only preloaded once the active camera has
+ *   video (or after [PRELOAD_GATE_MS]).
+ * - On a decoder initialization failure the preload window is reduced for the rest of the session.
  *
- * Alle methodes op de main thread aanroepen.
+ * Call all methods on the main thread.
  */
 class StreamManager(
     private val scope: CoroutineScope,
@@ -71,7 +71,7 @@ class StreamManager(
     private var gateJob: Job? = null
     private var disposed = false
 
-    /** Hoogste aantal gelijktijdige spelers ooit gezien (voor tests en debug-overlay). */
+    /** Highest number of simultaneous players ever seen (for tests and the debug overlay). */
     var maxObservedPlayers = 0
         private set
 
@@ -85,14 +85,14 @@ class StreamManager(
     // ------------------------------------------------------------------------------------
 
     /**
-     * Nieuwe cameralijst (na refresh of wijziging in de instellingen). De actieve camera blijft
-     * behouden als die nog bestaat; anders wordt [preferActiveId] gebruikt (laatst bekeken camera).
+     * New camera list (after a refresh or a settings change). The active camera is kept if it
+     * still exists; otherwise [preferActiveId] is used (last viewed camera).
      */
     fun setCameras(list: List<Camera>, preferActiveId: String? = null) {
         if (disposed) return
         val keepId = activeId?.takeIf { id -> list.any { it.id == id } } ?: preferActiveId
         val newIds = list.map { it.id }.toSet()
-        // Eerst verwijderde camera's opruimen (geeft spelers vrij).
+        // Clean up removed cameras first (releases players).
         val removed = controllers.keys.filter { it !in newIds }
         for (id in removed) {
             log.i(TAG, "event=camera_removed id=$id")
@@ -109,7 +109,7 @@ class StreamManager(
                 existing.updateCamera(cam)
             }
         }
-        // LinkedHashMap-volgorde gelijk trekken met de lijst.
+        // Align the LinkedHashMap order with the list.
         val ordered = list.associate { it.id to controllers.getValue(it.id) }
         controllers.clear()
         controllers.putAll(ordered)
@@ -132,18 +132,18 @@ class StreamManager(
         applyWindow()
     }
 
-    /** App naar de voorgrond. Idempotent: herhaald aanroepen start geen extra spelers. */
+    /** App to the foreground. Idempotent: repeated calls do not start extra players. */
     fun start() {
         if (started || disposed) return
         started = true
         log.i(TAG, "event=start cameras=${cameras.size}")
-        // Bij terugkeer naar de voorgrond krijgen camera's met een permanente fout een nieuwe kans.
+        // When returning to the foreground, cameras with a permanent error get another chance.
         controllers.values.filter { it.isError }.forEach { it.retry("app_foreground") }
         gateOpen = false
         applyWindow()
     }
 
-    /** App naar de achtergrond / scherm uit. Alle spelers en RTSP-verbindingen worden vrijgegeven. */
+    /** App to the background / screen off. All players and RTSP connections are released. */
     fun stop() {
         if (!started) return
         started = false
@@ -185,7 +185,7 @@ class StreamManager(
         if (available == networkAvailable) return
         networkAvailable = available
         log.i(TAG, "event=network available=$available")
-        // Bij herstel eerst de actieve camera, daarna de buren.
+        // On recovery, the active camera first, then the neighbours.
         val active = activeCamera()?.let { controllers[it.id] }
         active?.onNetworkChanged(available)
         controllers.values.filter { it !== active }.forEach { it.onNetworkChanged(available) }
@@ -206,7 +206,7 @@ class StreamManager(
     }
 
     // ------------------------------------------------------------------------------------
-    // Venster
+    // Window
     // ------------------------------------------------------------------------------------
 
     private fun applyWindow() {
@@ -219,19 +219,19 @@ class StreamManager(
         val slots = PlayerWindow.compute(cameras.size, activeIndex, effectivePreload)
         val wanted = slots.associate { cameras[it.cameraIndex].id to it.role }
 
-        // 1. Eerst vrijgeven wat buiten het venster valt.
+        // 1. First release whatever falls outside the window.
         for (c in controllers.values) {
             if (c.camera.id !in wanted && (c.role != null || c.hasPlayer)) c.detach("out_of_window")
         }
 
-        // 2. Actieve camera.
+        // 2. Active camera.
         val activeCam = cameras[activeIndex]
         if (activeCam.id != activeId) gateOpen = false
         activeId = activeCam.id
         val active = controllers.getValue(activeCam.id)
         active.attach(PlayerRole.ACTIVE)
 
-        // 3. Buren die al een speler hebben krijgen alleen een nieuwe rol (geen streamwissel).
+        // 3. Neighbours that already have a player only get a new role (no stream switch).
         for (slot in slots) {
             if (slot.role != PlayerRole.PRELOAD) continue
             val c = controllers.getValue(cameras[slot.cameraIndex].id)
@@ -240,7 +240,7 @@ class StreamManager(
         applyAudio()
         enforceLimit()
 
-        // 4. Nieuwe buren pas als de actieve camera beeld heeft (voorrang voor de actieve decoder).
+        // 4. New neighbours only once the active camera has video (priority for the active decoder).
         if (slots.any { it.role == PlayerRole.PRELOAD }) {
             if (gateOpen) {
                 startPreloads()
@@ -277,7 +277,7 @@ class StreamManager(
         for (c in controllers.values) c.setMuted(muted || c.camera.id != activeCamId)
     }
 
-    /** Vangnet: mag door de vensterlogica nooit nodig zijn. */
+    /** Safety net: should never be needed given the window logic. */
     private fun enforceLimit() {
         var count = playerCount
         if (count <= PlayerWindow.MAX_PLAYERS) return
@@ -295,7 +295,7 @@ class StreamManager(
         val newCap = (effectivePreload - 1).coerceAtLeast(0)
         if (newCap < preloadCap) {
             preloadCap = newCap
-            log.w(TAG, "event=preload_window_reduced new_size=$newCap reason=$reason (geldt voor de rest van de sessie)")
+            log.w(TAG, "event=preload_window_reduced new_size=$newCap reason=$reason scope=session")
         }
     }
 
@@ -307,7 +307,7 @@ class StreamManager(
 
     override fun onDecoderInitFailure(controller: StreamController): StreamController.DecoderDecision {
         if (controller.role != PlayerRole.ACTIVE) {
-            // Een voorgeladen speler mag de actieve camera nooit raken: deze geven we gewoon op.
+            // A preloaded player must never affect the active camera: we simply give this one up.
             reduceWindow("decoder_init_failed_on_preload camera=${controller.camera.name}")
             controller.detach("decoder_init_failed_preload")
             publish()
@@ -315,7 +315,7 @@ class StreamManager(
         }
         val others = controllers.values.filter { it !== controller && it.hasPlayer }
         if (others.isEmpty()) {
-            log.e(TAG, "event=decoder_init_failed_alone camera=${controller.camera.name} -> codecfout")
+            log.e(TAG, "event=decoder_init_failed_alone camera=${controller.camera.name} -> codec_error")
             return StreamController.DecoderDecision.GIVE_UP
         }
         reduceWindow("decoder_init_failed_on_active camera=${controller.camera.name}")

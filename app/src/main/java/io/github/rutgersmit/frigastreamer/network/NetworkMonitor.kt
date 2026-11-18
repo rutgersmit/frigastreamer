@@ -17,8 +17,8 @@ interface NetworkMonitor {
 }
 
 /**
- * Netwerkdetectie via [ConnectivityManager]-callbacks. Bewust ZONDER de eis
- * NET_CAPABILITY_INTERNET/VALIDATED: een LAN zonder internet is voor Frigate prima.
+ * Network detection via [ConnectivityManager] callbacks. Deliberately WITHOUT requiring
+ * NET_CAPABILITY_INTERNET/VALIDATED: a LAN without internet is fine for Frigate.
  */
 class AndroidNetworkMonitor(context: Context, private val log: Logger) : NetworkMonitor {
     private val cm = context.getSystemService(ConnectivityManager::class.java)
@@ -52,15 +52,15 @@ class AndroidNetworkMonitor(context: Context, private val log: Logger) : Network
             .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
             .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
             .build()
-        // Begintoestand: is er nu een actief netwerk?
+        // Initial state: is there an active network right now?
         val active = cm.activeNetwork
-        _status.value = NetworkStatus(active != null, if (active != null) describe(active) else "geen netwerk")
+        _status.value = NetworkStatus(active != null, if (active != null) describe(active) else "no network")
         cm.registerNetworkCallback(request, callback)
     }
 
     private fun update(event: String?) {
         val snapshot = synchronized(networks) { networks.values.toList() }
-        val new = NetworkStatus(snapshot.isNotEmpty(), if (snapshot.isEmpty()) "geen netwerk" else snapshot.joinToString(", "))
+        val new = NetworkStatus(snapshot.isNotEmpty(), if (snapshot.isEmpty()) "no network" else snapshot.joinToString(", "))
         if (new != _status.value) {
             if (new.available != _status.value.available || event != null) {
                 log.i(TAG, "event=network_${event ?: "changed"} available=${new.available} networks=\"${new.description}\"")

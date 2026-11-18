@@ -29,13 +29,13 @@ class FrigateApiException(message: String, val httpStatus: Int? = null, cause: T
     IOException(message, cause)
 
 /**
- * Minimale HTTP-client voor de Frigate-API (geen externe libraries).
+ * Minimal HTTP client for the Frigate API (no external libraries).
  *
- * - Interne modus: `http://<host>:5000`, geen authenticatie.
- * - Geauthenticeerde modus: `https://<host>:8971` (Frigate gebruikt daar standaard TLS met een
- *   self-signed certificaat), inloggen via `POST /api/login` met `{"user","password"}`;
- *   het JWT komt terug als cookie `frigate_token` en wordt bij elk verzoek meegestuurd.
- *   Bij 401 wordt één keer opnieuw ingelogd en het verzoek herhaald.
+ * - Internal mode: `http://<host>:5000`, no authentication.
+ * - Authenticated mode: `https://<host>:8971` (Frigate uses TLS with a self-signed certificate
+ *   there by default), login via `POST /api/login` with `{"user","password"}`;
+ *   the JWT comes back as cookie `frigate_token` and is sent with every request.
+ *   On a 401 the client logs in again once and repeats the request.
  */
 class FrigateClient(
     private val settingsProvider: () -> AppSettings,
@@ -51,7 +51,7 @@ class FrigateClient(
 
     suspend fun fetchVersion(): String = FrigateJson.parseVersion(get("/api/version"))
 
-    /** Test of de RTSP-poort (go2rtc) open staat. */
+    /** Tests whether the RTSP port (go2rtc) is open. */
     suspend fun probeRtsp(timeoutMs: Int = 2_000): Boolean = withContext(Dispatchers.IO) {
         val s = settingsProvider()
         if (s.host.isBlank()) return@withContext false
@@ -67,7 +67,7 @@ class FrigateClient(
 
     private suspend fun get(path: String): String = withContext(Dispatchers.IO) {
         val s = settingsProvider()
-        if (s.host.isBlank()) throw FrigateApiException("Geen Frigate-host ingesteld")
+        if (s.host.isBlank()) throw FrigateApiException("No Frigate host configured")
         if (s.apiMode == ApiMode.AUTHENTICATED) {
             val key = sessionKey(s)
             if (token == null || tokenFor != key) login(s)
@@ -87,7 +87,7 @@ class FrigateClient(
     private suspend fun login(s: AppSettings) = tokenLock.withLock {
         val key = sessionKey(s)
         if (token != null && tokenFor == key) return@withLock
-        if (s.apiUsername.isBlank()) throw FrigateApiException("Geen API-gebruikersnaam ingesteld voor de geauthenticeerde modus")
+        if (s.apiUsername.isBlank()) throw FrigateApiException("No API username configured for authenticated mode")
         val body = Json.encodeToString(
             kotlinx.serialization.json.JsonObject.serializer(),
             buildJsonObject {
@@ -97,11 +97,11 @@ class FrigateClient(
         )
         val r = request(s, "POST", "/api/login", body, sendToken = false)
         if (r.status == 401 || r.status == 400 || r.status == 403) {
-            throw FrigateApiException("Inloggen bij Frigate mislukt (HTTP ${r.status}): controleer gebruikersnaam/wachtwoord", r.status)
+            throw FrigateApiException("Login to Frigate failed (HTTP ${r.status}): check username/password", r.status)
         }
-        if (r.status !in 200..299) throw FrigateApiException("Inloggen bij Frigate mislukt (HTTP ${r.status})", r.status)
+        if (r.status !in 200..299) throw FrigateApiException("Login to Frigate failed (HTTP ${r.status})", r.status)
         val t = r.cookies["frigate_token"] ?: r.cookies.entries.firstOrNull { it.key.contains("token") }?.value
-            ?: throw FrigateApiException("Frigate gaf geen frigate_token-cookie terug")
+            ?: throw FrigateApiException("Frigate did not return a frigate_token cookie")
         token = t
         tokenFor = key
         log.i(TAG, "event=login_ok user_set=true")
@@ -110,7 +110,7 @@ class FrigateClient(
     private data class Response(val status: Int, val body: String, val cookies: Map<String, String>) {
         fun bodyOrThrow(path: String): String {
             if (status in 200..299) return body
-            throw FrigateApiException("HTTP $status op $path", status)
+            throw FrigateApiException("HTTP $status on $path", status)
         }
     }
 
@@ -151,7 +151,7 @@ class FrigateClient(
             }
             return Response(status, text, cookies)
         } catch (e: IOException) {
-            throw FrigateApiException("Frigate niet bereikbaar op ${Redact.url(url.toString())}: ${e.javaClass.simpleName}", null, e)
+            throw FrigateApiException("Frigate not reachable at ${Redact.url(url.toString())}: ${e.javaClass.simpleName}", null, e)
         } finally {
             conn.disconnect()
         }
@@ -168,7 +168,7 @@ class FrigateClient(
             return "$scheme://$h:${s.apiPort}"
         }
 
-        /** Alleen gebruikt voor de Frigate-host als "self-signed accepteren" aan staat (LAN). */
+        /** Only used for the Frigate host when "accept self-signed" is enabled (LAN). */
         private val trustAllFactory: SSLSocketFactory by lazy {
             val tm = object : X509TrustManager {
                 override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit

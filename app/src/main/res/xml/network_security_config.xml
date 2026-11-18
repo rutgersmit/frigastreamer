@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Frigate gebruikt op het LAN HTTP (poort 5000) en RTSP. Android kan cleartext niet beperken tot
-  IP-bereiken (domain-config accepteert alleen hostnamen), dus cleartext staat app-breed aan.
-  De app maakt uitsluitend verbinding met de geconfigureerde Frigate-host en handmatig ingevoerde
-  camera-URL's; er is geen ander netwerkverkeer.
+  Frigate uses HTTP (port 5000) and RTSP on the LAN. Android cannot restrict cleartext to
+  IP ranges (domain-config only accepts hostnames), so cleartext is enabled app-wide.
+  The app only connects to the configured Frigate host and manually entered camera URLs;
+  there is no other network traffic.
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">

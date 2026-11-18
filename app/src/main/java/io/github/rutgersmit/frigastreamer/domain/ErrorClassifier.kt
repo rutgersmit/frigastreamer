@@ -2,10 +2,10 @@ package io.github.rutgersmit.frigastreamer.domain
 
 import io.github.rutgersmit.frigastreamer.domain.PlaybackErrorCodes as C
 
-/** Vertaalt een [FailureInfo] naar een [ErrorCategory]. Pure functie, volledig unit-getest. */
+/** Translates a [FailureInfo] into an [ErrorCategory]. Pure function, fully unit tested. */
 object ErrorClassifier {
 
-    /** Media3 meldt RTSP-statusfouten als bv. "DESCRIBE 404" of "SETUP 401 Unauthorized". */
+    /** Media3 reports RTSP status errors as e.g. "DESCRIBE 404" or "SETUP 401 Unauthorized". */
     private val rtspStatus = Regex("""\b(OPTIONS|DESCRIBE|SETUP|PLAY|PAUSE|TEARDOWN|GET_PARAMETER)\s+(\d{3})\b""")
 
     fun classify(info: FailureInfo): ErrorCategory {

@@ -3,13 +3,13 @@ package io.github.rutgersmit.frigastreamer.domain
 data class WindowSlot(val cameraIndex: Int, val role: PlayerRole)
 
 /**
- * Sliding window van spelers, gebaseerd op CAMERA-index (niet op pager-pagina).
+ * Sliding window of players, based on CAMERA index (not on pager page).
  *
- * - preload 0: alleen de actieve camera
- * - preload 1: actieve + volgende camera
- * - preload 2: actieve + volgende + vorige camera
+ * - preload 0: only the active camera
+ * - preload 1: active + next camera
+ * - preload 2: active + next + previous camera
  *
- * Duplicaten (bij 1 of 2 camera's) worden samengevoegd; nooit meer dan [MAX_PLAYERS] slots.
+ * Duplicates (with 1 or 2 cameras) are merged; never more than [MAX_PLAYERS] slots.
  */
 object PlayerWindow {
     const val MAX_PLAYERS = 3
@@ -32,18 +32,18 @@ object PlayerWindow {
         return result
     }
 
-    /** Camera-index bij een virtuele pager-pagina (wrap-around). */
+    /** Camera index for a virtual pager page (wrap-around). */
     fun cameraIndexForPage(page: Int, cameraCount: Int): Int =
         if (cameraCount <= 0) 0 else Math.floorMod(page, cameraCount)
 
-    /** Grote virtuele page count voor wrap-around; 1 camera = geen swipen. */
+    /** Large virtual page count for wrap-around; 1 camera = no swiping. */
     fun virtualPageCount(cameraCount: Int): Int = when {
         cameraCount <= 0 -> 0
         cameraCount == 1 -> 1
         else -> (VIRTUAL_PAGES / cameraCount) * cameraCount
     }
 
-    /** Startpagina in het midden van het virtuele bereik die op [cameraIndex] uitkomt. */
+    /** Start page in the middle of the virtual range that lands on [cameraIndex]. */
     fun initialPage(cameraCount: Int, cameraIndex: Int): Int {
         if (cameraCount <= 1) return 0
         val total = virtualPageCount(cameraCount)
@@ -52,10 +52,10 @@ object PlayerWindow {
     }
 
     /**
-     * Op welke pager-pagina de speler van [cameraIndex] gekoppeld wordt als [currentPage] zichtbaar is.
-     * Bij weinig camera's kan dezelfde camera op meerdere pagina's staan (bv. 2 camera's: links én
-     * rechts dezelfde); de speler mag maar aan één view hangen, dus kiezen we één "canonieke" pagina:
-     * de dichtstbijzijnde, bij gelijke afstand de volgende (rechts).
+     * Which pager page the player of [cameraIndex] is bound to while [currentPage] is visible.
+     * With few cameras the same camera can appear on several pages (e.g. 2 cameras: the same one
+     * on the left and on the right); a player can only be attached to one view, so we pick one
+     * "canonical" page: the nearest one, and on a tie the next one (right).
      */
     fun boundPageFor(cameraIndex: Int, currentPage: Int, cameraCount: Int): Int {
         if (cameraCount <= 1) return currentPage

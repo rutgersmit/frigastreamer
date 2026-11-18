@@ -1,4 +1,160 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Default (English) UI strings. Every key here must also exist in values-nl/strings.xml;
+    StringResourcesTest enforces this.
+-->
 <resources>
-    <string name="app_name">FrigaStreamer</string>
+    <string name="app_name" translatable="false">FrigaStreamer</string>
+
+    <!-- Live screen -->
+    <string name="live_not_configured">No Frigate server configured yet.</string>
+    <string name="live_loading_cameras">Fetching camera list…</string>
+    <string name="live_no_cameras">No cameras found.</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_sound_on">Sound on</string>
+    <string name="action_sound_off">Sound off</string>
+    <string name="page_indicator" translatable="false">%1$d / %2$d</string>
+
+    <!-- Camera page -->
+    <string name="status_connecting">Connecting…</string>
+    <string name="status_camera_offline">Camera offline</string>
+    <string name="status_audio_unsupported">No sound: audio codec not supported</string>
+    <string name="error_cannot_play">Cannot play this camera</string>
+    <string name="error_hint_codec">Tip: let go2rtc transcode this stream to H.264/AAC, e.g. ffmpeg:%1$s#video=h264#audio=aac (see README).</string>
+    <string name="error_hint_auth">Check the RTSP username and password in the settings.</string>
+    <string name="error_auto_retry_disabled">Automatic retry is disabled for this type of error.</string>
+    <string name="action_retry">Retry</string>
+    <string name="info_last_frame">Last frame</string>
+    <string name="info_no_frame_yet">no frame received yet</string>
+    <string name="info_next_attempt">Next attempt</string>
+    <string name="info_when_network_returns">as soon as the network is back</string>
+    <string name="info_connecting_now">connecting…</string>
+    <string name="info_next_attempt_in">in %1$d s (attempt %2$d)</string>
+
+    <!-- Diagnosis on the offline screen -->
+    <string name="diag_no_network">No network connection</string>
+    <string name="diag_frigate_unreachable">Frigate is not reachable</string>
+    <string name="diag_rtsp_unreachable">Frigate is reachable, but the RTSP server (go2rtc) is not</string>
+    <string name="diag_stalled">Connection open, but no new frames are arriving</string>
+    <string name="diag_codec">Codec or decoder problem</string>
+    <string name="diag_camera_unreachable">Frigate is reachable, but this camera is not (%1$s)</string>
+    <string name="diag_no_image">No image</string>
+
+    <!-- Error categories -->
+    <string name="err_network">Network error</string>
+    <string name="err_network_unavailable">No network connection</string>
+    <string name="err_connect_timeout">Connecting takes too long</string>
+    <string name="err_rtsp_protocol">RTSP protocol error</string>
+    <string name="err_rtsp_not_found">Stream not found on the RTSP server</string>
+    <string name="err_rtsp_auth">RTSP authentication failed</string>
+    <string name="err_stream_ended">Stream ended by the server</string>
+    <string name="err_stalled">Connection open, but no new frames</string>
+    <string name="err_unsupported_video_codec">Video codec not supported by this device</string>
+    <string name="err_unsupported_audio_codec">Audio codec not supported</string>
+    <string name="err_decoder_init">Video decoder could not start</string>
+    <string name="err_decoding">Decoder error</string>
+    <string name="err_codec_permanent">Stream cannot be decoded</string>
+    <string name="err_unknown">Unknown stream error</string>
+
+    <!-- Settings: header -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back to cameras</string>
+    <string name="settings_version">Version %1$s (build %2$d)</string>
+
+    <!-- Settings: camera list -->
+    <string name="section_camera_list">Camera list</string>
+    <string name="api_reachable">reachable</string>
+    <string name="api_reachable_version">reachable (Frigate %1$s)</string>
+    <string name="api_unreachable">unreachable</string>
+    <string name="api_auth_failed">login failed</string>
+    <string name="api_unknown">unknown</string>
+    <string name="api_status">Frigate API: %1$s · RTSP port: %2$s</string>
+    <string name="refresh_not_fetched">Not fetched yet</string>
+    <string name="refresh_not_configured">Set the Frigate IP address first</string>
+    <string name="refresh_failed">Frigate API unreachable: %1$s</string>
+    <plurals name="refresh_streams">
+        <item quantity="one">%d go2rtc stream</item>
+        <item quantity="other">%d go2rtc streams</item>
+    </plurals>
+    <plurals name="refresh_cameras">
+        <item quantity="one">%d camera</item>
+        <item quantity="other">%d cameras</item>
+    </plurals>
+    <string name="refresh_config_unavailable">(config not available: only stream names used)</string>
+    <plurals name="refresh_unmatched">
+        <item quantity="one">%d without stream</item>
+        <item quantity="other">%d without stream</item>
+    </plurals>
+    <string name="refresh_last_success">last succeeded %1$s</string>
+    <string name="refresh_using_cache">using last known list</string>
+    <string name="unmatched_header">Cameras without a go2rtc stream (not shown):</string>
+    <string name="unmatched_disabled">camera is disabled in Frigate (enabled: false)</string>
+    <string name="unmatched_no_stream">no go2rtc stream named \'%1$s\' (camera does not use go2rtc)</string>
+    <string name="unmatched_streams_missing">none of the referenced streams exist in go2rtc</string>
+    <string name="action_busy">Busy…</string>
+    <string name="action_refresh_camera_list">Refresh camera list</string>
+    <string name="action_add_camera_manually">Add camera manually</string>
+
+    <!-- Settings: other -->
+    <string name="section_other">Other</string>
+    <string name="setting_start_muted">Always start muted</string>
+    <string name="setting_orientation">Screen orientation</string>
+    <string name="orientation_landscape">Landscape</string>
+    <string name="orientation_portrait">Portrait</string>
+    <string name="orientation_auto">Automatic</string>
+    <string name="setting_debug_overlay">Show debug overlay</string>
+    <string name="home_app_is_default">This app is now the default home app (starts automatically after a reboot).</string>
+    <string name="home_app_not_default">Choose this app as the default home app to have it start automatically after a reboot.</string>
+    <string name="action_home_app_settings">Set / restore default home app</string>
+
+    <!-- Settings: Frigate -->
+    <string name="section_frigate">Frigate</string>
+    <string name="field_host">IP address or hostname (e.g. 192.168.1.10)</string>
+    <string name="field_api_mode">API mode</string>
+    <string name="api_mode_internal">Internal (port 5000, no login)</string>
+    <string name="api_mode_authenticated">Authenticated (port 8971, login)</string>
+    <string name="field_api_port">API port</string>
+    <string name="setting_use_https">Use HTTPS (Frigate default on 8971)</string>
+    <string name="setting_trust_self_signed">Accept Frigate\'s self-signed certificate</string>
+    <string name="field_api_username">API username</string>
+    <string name="field_api_password">API password</string>
+    <string name="field_rtsp_port">RTSP port (go2rtc)</string>
+    <string name="field_rtsp_username">RTSP username (optional, go2rtc)</string>
+    <string name="field_rtsp_password">RTSP password</string>
+    <string name="field_substream_pattern">Substream name pattern (default %1$s)</string>
+    <string name="action_save_and_refresh">Save and fetch camera list</string>
+
+    <!-- Settings: recovery -->
+    <string name="section_recovery">Recovery</string>
+    <string name="setting_preload_window">Preload window (preloaded neighbouring cameras)</string>
+    <string name="preload_0">0 (active only)</string>
+    <string name="preload_1">1 (next)</string>
+    <string name="preload_2">2 (next + previous)</string>
+    <string name="setting_offline_threshold">Offline threshold (seconds)</string>
+    <string name="setting_watchdog">Frame watchdog</string>
+    <string name="setting_watchdog_timeout">Watchdog timeout (seconds without a new frame)</string>
+    <string name="setting_backoff_min">Reconnect backoff minimum (seconds)</string>
+    <string name="setting_backoff_max">Reconnect backoff maximum (seconds)</string>
+    <string name="setting_range" translatable="false">%1$s [%2$d-%3$d]</string>
+
+    <!-- Settings: camera rows and dialog -->
+    <string name="camera_hidden_suffix">%1$s (hidden)</string>
+    <string name="camera_source_auto">automatic</string>
+    <string name="camera_source_manual">manual</string>
+    <string name="camera_main_url">main: %1$s</string>
+    <string name="camera_sub_url">sub: %1$s</string>
+    <string name="camera_no_substream">no substream</string>
+    <string name="camera_visible">Visible</string>
+    <string name="camera_prefer_sub">Substream when active</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_delete">Delete</string>
+    <string name="dialog_add_camera">Add camera</string>
+    <string name="dialog_edit_camera">Edit camera</string>
+    <string name="field_name">Name</string>
+    <string name="field_main_url">RTSP URL main stream</string>
+    <string name="field_sub_url">RTSP URL substream (optional)</string>
+    <string name="dialog_keep_auto_url">Leave empty/unchanged to keep the automatically determined URL.</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
 </resources>

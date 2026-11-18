@@ -11,7 +11,7 @@ class ErrorClassifierTest {
         ErrorClassifier.classify(FailureInfo(code, track, msgs.toList()))
 
     @Test
-    fun `gespiegelde foutcodes zijn gelijk aan Media3`() {
+    fun `mirrored error codes match Media3`() {
         assertEquals(PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED, PlaybackErrorCodes.IO_NETWORK_CONNECTION_FAILED)
         assertEquals(PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT, PlaybackErrorCodes.IO_NETWORK_CONNECTION_TIMEOUT)
         assertEquals(PlaybackException.ERROR_CODE_IO_UNSPECIFIED, PlaybackErrorCodes.IO_UNSPECIFIED)
@@ -29,19 +29,19 @@ class ErrorClassifierTest {
     }
 
     @Test
-    fun `netwerkfouten zijn tijdelijk`() {
+    fun `network errors are transient`() {
         assertEquals(ErrorCategory.NETWORK, c(PlaybackErrorCodes.IO_NETWORK_CONNECTION_FAILED))
         assertEquals(ErrorCategory.CONNECT_TIMEOUT, c(PlaybackErrorCodes.IO_NETWORK_CONNECTION_TIMEOUT))
         assertEquals(ErrorCategory.CONNECT_TIMEOUT, c(PlaybackErrorCodes.IO_UNSPECIFIED, null, "SocketTimeoutException: Read timed out"))
         assertEquals(ErrorCategory.NETWORK, c(PlaybackErrorCodes.IO_UNSPECIFIED, null, "IOException: x"))
         assertEquals(ErrorCategory.NETWORK, c(PlaybackErrorCodes.UNSPECIFIED, null, "ConnectException: ECONNREFUSED"))
         for (cat in listOf(ErrorCategory.NETWORK, ErrorCategory.CONNECT_TIMEOUT, ErrorCategory.RTSP_PROTOCOL, ErrorCategory.RTSP_NOT_FOUND, ErrorCategory.STALLED, ErrorCategory.UNKNOWN)) {
-            assertFalse("$cat mag niet permanent zijn", cat.permanent)
+            assertFalse("$cat must not be permanent", cat.permanent)
         }
     }
 
     @Test
-    fun `RTSP-statuscodes uit Media3-meldingen`() {
+    fun `RTSP status codes from Media3 messages`() {
         assertEquals(ErrorCategory.RTSP_NOT_FOUND, c(PlaybackErrorCodes.IO_UNSPECIFIED, null, "RtspPlaybackException: DESCRIBE 404"))
         assertEquals(ErrorCategory.RTSP_AUTH, c(PlaybackErrorCodes.IO_UNSPECIFIED, null, "PlaybackException: x", "RtspPlaybackException: DESCRIBE 401"))
         assertEquals(ErrorCategory.RTSP_PROTOCOL, c(PlaybackErrorCodes.IO_UNSPECIFIED, null, "RtspPlaybackException: SETUP 461"))
@@ -52,7 +52,7 @@ class ErrorClassifierTest {
     }
 
     @Test
-    fun `codecfouten onderscheiden video en audio`() {
+    fun `codec errors distinguish video and audio`() {
         assertEquals(ErrorCategory.UNSUPPORTED_VIDEO_CODEC, c(PlaybackErrorCodes.DECODING_FORMAT_UNSUPPORTED, TrackKind.VIDEO))
         assertEquals(ErrorCategory.UNSUPPORTED_VIDEO_CODEC, c(PlaybackErrorCodes.DECODING_FORMAT_EXCEEDS_CAPABILITIES, null))
         assertEquals(ErrorCategory.UNSUPPORTED_AUDIO_CODEC, c(PlaybackErrorCodes.DECODING_FORMAT_UNSUPPORTED, TrackKind.AUDIO))
@@ -62,7 +62,7 @@ class ErrorClassifierTest {
         assertEquals(ErrorCategory.DECODER_INIT, c(PlaybackErrorCodes.DECODING_RESOURCES_RECLAIMED))
         assertEquals(ErrorCategory.DECODING, c(PlaybackErrorCodes.DECODING_FAILED, TrackKind.VIDEO))
         assertTrue(ErrorCategory.UNSUPPORTED_VIDEO_CODEC.permanent)
-        assertFalse("audio is niet fataal: video moet blijven werken", ErrorCategory.UNSUPPORTED_AUDIO_CODEC.permanent)
+        assertFalse("audio is not fatal: video must keep working", ErrorCategory.UNSUPPORTED_AUDIO_CODEC.permanent)
         assertEquals(ErrorCategory.UNKNOWN, c(PlaybackErrorCodes.UNSPECIFIED, null, "IllegalStateException"))
     }
 }

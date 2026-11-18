@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,16 +61,16 @@ fun LiveScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
     if (cameras.isEmpty()) {
         EmptyState(
             message = when {
-                !settings.isConfigured -> "Nog geen Frigate-server ingesteld."
-                refresh.inProgress -> "Cameralijst ophalen..."
-                else -> "Geen camera's gevonden.\n${refresh.message}"
+                !settings.isConfigured -> stringResource(R.string.live_not_configured)
+                refresh.inProgress -> stringResource(R.string.live_loading_cameras)
+                else -> stringResource(R.string.live_no_cameras) + "\n" + refreshSummary(refresh)
             },
             onOpenSettings = onOpenSettings,
             onRefresh = vm::refreshCameras,
         )
         return
     }
-    // Bij een gewijzigde cameralijst een nieuwe pager, gestart op de huidige camera.
+    // A new pager when the camera list changes, starting at the current camera.
     key(cameras.map { it.id }) {
         CameraPager(vm, cameras, state.activeIndex, state.muted, settings.debugOverlay, onOpenSettings)
     }
@@ -149,7 +150,7 @@ private fun CameraPager(
             )
         }
 
-        // Cameranaam, ~2 s na het wisselen.
+        // Camera name, for ~2 s after switching.
         AnimatedVisibility(
             visible = nameVisible,
             enter = fadeIn(),
@@ -167,7 +168,7 @@ private fun CameraPager(
             )
         }
 
-        // Pagina-indicator, mute en instellingen: verdwijnen na enkele seconden, terug bij aanraken.
+        // Page indicator, mute and settings: fade out after a few seconds, come back on touch.
         AnimatedVisibility(
             visible = controlsVisible,
             enter = fadeIn(),
@@ -176,7 +177,7 @@ private fun CameraPager(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    "${currentIndex + 1} / $n",
+                    stringResource(R.string.page_indicator, currentIndex + 1, n),
                     color = Color.White,
                     fontSize = 16.sp,
                     modifier = Modifier
@@ -185,12 +186,12 @@ private fun CameraPager(
                 )
                 RoundIconButton(
                     icon = if (muted) R.drawable.ic_volume_off else R.drawable.ic_volume_up,
-                    description = if (muted) "Geluid aan" else "Geluid uit",
+                    description = stringResource(if (muted) R.string.action_sound_on else R.string.action_sound_off),
                 ) {
                     vm.toggleMute()
                     interaction++
                 }
-                RoundIconButton(icon = R.drawable.ic_settings, description = "Instellingen") { onOpenSettings() }
+                RoundIconButton(icon = R.drawable.ic_settings, description = stringResource(R.string.action_settings)) { onOpenSettings() }
             }
         }
 
@@ -219,13 +220,13 @@ private fun EmptyState(message: String, onOpenSettings: () -> Unit, onRefresh: (
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("FrigaStreamer", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+            Text(stringResource(R.string.app_name), color = Color.White, style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(12.dp))
             Text(message, color = Color(0xFFBBBBBB), style = MaterialTheme.typography.bodyLarge)
             Spacer(Modifier.height(24.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onOpenSettings) { Text("Instellingen") }
-                Button(onClick = onRefresh) { Text("Opnieuw ophalen") }
+                Button(onClick = onOpenSettings) { Text(stringResource(R.string.action_settings)) }
+                Button(onClick = onRefresh) { Text(stringResource(R.string.action_refresh)) }
             }
         }
     }

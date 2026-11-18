@@ -29,16 +29,16 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Media3/ExoPlayer-implementatie van [StreamPlayer] voor RTSP-livestreams.
+ * Media3/ExoPlayer implementation of [StreamPlayer] for RTSP live streams.
  *
- * - RTSP altijd over TCP (`setForceUseRtpTcp(true)`), geen UDP.
- * - Kleine buffers voor lage latency.
- * - Decoder-fallback aan: als de hardwaredecoder niet start, probeert Media3 een andere.
- * - Credentials gaan via de userinfo van de URI naar Media3 (de enige manier die Media3 RTSP
- *   ondersteunt); Media3 haalt die er zelf weer uit voor de RTSP-requests. RTSP-debuglogging
- *   van Media3 staat uit, en zelf loggen we alleen geredacteerde URL's.
- * - Alle callbacks worden via de main-looper doorgestuurd, zodat de controller nooit binnen een
- *   ExoPlayer-callback de speler vrijgeeft.
+ * - RTSP always over TCP (`setForceUseRtpTcp(true)`), no UDP.
+ * - Small buffers for low latency.
+ * - Decoder fallback enabled: if the hardware decoder fails to start, Media3 tries another one.
+ * - Credentials are passed to Media3 via the URI's userinfo (the only way Media3 RTSP
+ *   supports); Media3 strips them again for the RTSP requests. Media3's RTSP debug logging
+ *   is off, and we only log redacted URLs ourselves.
+ * - All callbacks are forwarded via the main looper, so the controller never releases the
+ *   player from within an ExoPlayer callback.
  */
 @OptIn(UnstableApi::class)
 class ExoStreamPlayer(
@@ -67,7 +67,7 @@ class ExoStreamPlayer(
                 Player.STATE_BUFFERING -> post { it.onBuffering(true) }
                 Player.STATE_READY -> post { it.onBuffering(false) }
                 Player.STATE_ENDED -> post {
-                    it.onFailure(PlayerFailure(ErrorCategory.STREAM_ENDED, "server stuurt geen RTP-data meer"))
+                    it.onFailure(PlayerFailure(ErrorCategory.STREAM_ENDED, "server stopped sending RTP data"))
                 }
                 else -> Unit
             }
@@ -112,14 +112,14 @@ class ExoStreamPlayer(
                     it.onFailure(
                         PlayerFailure(
                             ErrorCategory.UNSUPPORTED_VIDEO_CODEC,
-                            "geen afspeelbare videotrack in de stream (codec niet ondersteund door Media3 RTSP)",
+                            "no playable video track in the stream (codec not supported by Media3 RTSP)",
                         ),
                     )
                 }
             } else if (!videoSupported) {
                 post {
                     it.onFailure(
-                        PlayerFailure(ErrorCategory.UNSUPPORTED_VIDEO_CODEC, "videocodec $videoMime ${width}x$height niet ondersteund"),
+                        PlayerFailure(ErrorCategory.UNSUPPORTED_VIDEO_CODEC, "video codec $videoMime ${width}x$height not supported"),
                     )
                 }
             }
@@ -198,8 +198,8 @@ class ExoStreamPlayer(
 
     override fun frameCounter(): Long {
         if (released) return metadataFrames.get()
-        // Gerenderde frames (VideoFrameMetadataListener) plus frames die de decoder wel verwerkte
-        // maar niet toonde (bv. een voorgeladen speler die even geen surface heeft).
+        // Rendered frames (VideoFrameMetadataListener) plus frames the decoder did process
+        // but did not show (e.g. a preloaded player that briefly has no surface).
         return metadataFrames.get() + decoderProgress.update(exoPlayer.videoDecoderCounters)
     }
 
@@ -254,7 +254,7 @@ class ExoStreamPlayer(
         return FailureInfo(error.errorCode, trackKind, messages)
     }
 
-    /** Houdt een monotone som bij van verwerkte (ook overgeslagen/gedropte) videobuffers. */
+    /** Keeps a monotonic sum of processed (including skipped/dropped) video buffers. */
     private class DecoderProgress {
         private var lastCounters: Any? = null
         private var lastValue = 0L
@@ -279,7 +279,7 @@ class ExoStreamPlayer(
     companion object {
         private val nextId = AtomicInteger()
 
-        /** Na zoveel ms zonder RTP-pakketten meldt Media3 einde stream (wordt een reconnect). */
+        /** After this many ms without RTP packets Media3 reports end of stream (becomes a reconnect). */
         const val RTP_TIMEOUT_MS = 8_000L
     }
 }

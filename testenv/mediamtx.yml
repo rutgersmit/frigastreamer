@@ -25,29 +25,29 @@ pathDefaults:
   runOnInitRestart: yes
 
 paths:
-  # Wordt gepubliceerd door de container cam-voordeur (te stoppen/pauzeren).
-  voordeur:
-  voordeur_sub:
+  # Wordt gepubliceerd door de container cam-front-door (te stoppen/pauzeren).
+  front_door:
+  front_door_sub:
 
   # Normale situatie: H.264 + AAC, met substream.
-  tuin:
+  garden:
     runOnInit: >-
       ffmpeg -hide_banner -loglevel warning -re -f lavfi -i smptebars=size=960x540:rate=20
       -f lavfi -i sine=frequency=660:sample_rate=48000
       -c:v libx264 -preset ultrafast -tune zerolatency -g 20 -c:a aac -b:a 64k
-      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/tuin
-  tuin_sub:
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/garden
+  garden_sub:
     runOnInit: >-
       ffmpeg -hide_banner -loglevel warning -re -f lavfi -i smptebars=size=480x270:rate=10
       -c:v libx264 -preset ultrafast -tune zerolatency -g 10 -an
-      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/tuin_sub
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/garden_sub
 
   # Alleen video (geen audio).
-  oprit:
+  driveway:
     runOnInit: >-
       ffmpeg -hide_banner -loglevel warning -re -f lavfi -i testsrc=size=640x480:rate=15
       -c:v libx264 -preset ultrafast -tune zerolatency -g 15 -an
-      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/oprit
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/driveway
 
   # H.265/HEVC: speelt alleen als de tablet HEVC kan decoderen.
   garage:
@@ -57,41 +57,41 @@ paths:
       -f rtsp -rtsp_transport tcp rtsp://localhost:8554/garage
 
   # G.711 A-law audio (zoals veel deurbellen/IP-camera's).
-  deurbel:
+  doorbell:
     runOnInit: >-
       ffmpeg -hide_banner -loglevel warning -re -f lavfi -i testsrc2=size=640x480:rate=15
       -f lavfi -i sine=frequency=880:sample_rate=8000
       -c:v libx264 -preset ultrafast -tune zerolatency -g 15 -c:a pcm_alaw -ar 8000 -ac 1
-      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/deurbel
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/doorbell
 
   # Ongecomprimeerde PCM-audio (L16).
-  schuur:
+  shed:
     runOnInit: >-
       ffmpeg -hide_banner -loglevel warning -re -f lavfi -i mandelbrot=size=640x360:rate=10
       -f lavfi -i sine=frequency=330:sample_rate=16000
       -c:v libx264 -preset ultrafast -tune zerolatency -g 10 -c:a pcm_s16be -ar 16000 -ac 1
-      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/schuur
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/shed
 
   # Lage keyframe-interval (0,5 s).
-  snel_gop:
+  fast_gop:
     runOnInit: >-
       ffmpeg -hide_banner -loglevel warning -re -f lavfi -i testsrc2=size=640x360:rate=20
       -c:v libx264 -preset ultrafast -tune zerolatency -g 10 -an
-      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/snel_gop
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/fast_gop
 
   # Hoge keyframe-interval (10 s): eerste beeld kan tot 10 s duren (watchdog mag niet afgaan).
-  traag_gop:
+  slow_gop:
     runOnInit: >-
       ffmpeg -hide_banner -loglevel warning -re -f lavfi -i testsrc2=size=640x360:rate=10
       -c:v libx264 -preset ultrafast -tune zerolatency -g 100 -keyint_min 100 -sc_threshold 0 -an
-      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/traag_gop
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/slow_gop
 
   # Full HD.
-  achterdeur:
+  back_door:
     runOnInit: >-
       ffmpeg -hide_banner -loglevel warning -re -f lavfi -i testsrc2=size=1920x1080:rate=15
       -c:v libx264 -preset ultrafast -tune zerolatency -g 15 -an
-      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/achterdeur
+      -f rtsp -rtsp_transport tcp rtsp://localhost:8554/back_door
 
   # Stream die in de Frigate-config niet voorkomt: verschijnt als losse camera (met _sub).
   carport:

@@ -6,9 +6,9 @@ import android.content.pm.PackageManager
 import android.provider.Settings
 
 /**
- * Hulpfuncties voor de optionele home-app-modus (automatisch starten na reboot).
- * Sinds Android 10 mag een BOOT_COMPLETED-receiver geen Activity starten; als standaard
- * home-app start Android de app na een reboot zelf.
+ * Helpers for the optional home app mode (auto-start after reboot).
+ * Since Android 10 a BOOT_COMPLETED receiver may not start an Activity; as the default
+ * home app, Android starts the app itself after a reboot.
  */
 object HomeAppHelper {
     fun isDefaultHome(context: Context): Boolean {
@@ -17,7 +17,7 @@ object HomeAppHelper {
         return info?.activityInfo?.packageName == context.packageName
     }
 
-    /** Opent de systeeminstelling voor de standaard home-app (om in of uit te schakelen). */
+    /** Opens the system setting for the default home app (to enable or disable it). */
     fun openHomeSettings(context: Context) {
         val candidates = listOf(
             Intent(Settings.ACTION_HOME_SETTINGS),

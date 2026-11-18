@@ -20,7 +20,7 @@ import io.github.rutgersmit.frigastreamer.util.Clock
 import io.github.rutgersmit.frigastreamer.util.Logger
 import io.github.rutgersmit.frigastreamer.util.SystemClockImpl
 
-/** Eenvoudige handmatige dependency-container (geen DI-framework nodig). */
+/** Simple manual dependency container (no DI framework needed). */
 class AppGraph(app: Application) {
     val log: Logger = AndroidLogger
     val clock: Clock = SystemClockImpl
@@ -32,7 +32,7 @@ class AppGraph(app: Application) {
     val cameraRepository = CameraRepository(settingsRepository, frigateClient, clock, log)
     val networkMonitor: NetworkMonitor = AndroidNetworkMonitor(app, log)
     val healthMonitor = FrigateHealthMonitor(frigateClient, appScope, clock, log) {
-        // Frigate is weer bereikbaar: cameralijst bijwerken (nieuwe/verwijderde camera's).
+        // Frigate is reachable again: refresh the camera list (new/removed cameras).
         appScope.launch { cameraRepository.refresh("api_recovered") }
     }
 }

@@ -27,16 +27,15 @@ import io.github.rutgersmit.frigastreamer.util.Logger
 import io.github.rutgersmit.frigastreamer.util.Redact
 
 /**
- * Lichte controller per camera: status, reconnect-state-machine, frame-watchdog,
- * offline-drempel en foutclassificatie. Bestaat zolang de camera in de lijst staat;
- * de (zware) [StreamPlayer] bestaat alleen zolang de camera in het spelervenster valt
- * (tussen [attach] en [detach]).
+ * Lightweight controller per camera: status, reconnect state machine, frame watchdog,
+ * offline threshold and error classification. Lives as long as the camera is in the list;
+ * the (heavy) [StreamPlayer] only exists while the camera is inside the player window
+ * (between [attach] and [detach]).
  *
- * Threading: alle methodes moeten op de dispatcher van [parentScope] (main thread) worden
- * aangeroepen; spelercallbacks komen ook op die thread binnen. Daardoor zijn er geen locks
- * nodig en kan er per camera maar één reconnect-proces tegelijk lopen: elke nieuwe
- * (re)connect annuleert eerst de vorige timer, en callbacks van een oude sessie worden
- * via een sessienummer genegeerd.
+ * Threading: all methods must be called on the dispatcher of [parentScope] (main thread);
+ * player callbacks also arrive on that thread. So no locks are needed and only one
+ * reconnect process can run per camera at a time: every new (re)connect first cancels the
+ * previous timer, and callbacks from an old session are ignored via a session number.
  */
 class StreamController(
     camera: Camera,
@@ -50,20 +49,20 @@ class StreamController(
     interface Host {
         fun rtspCredentials(): RtspCredentials?
 
-        /** Wordt aangeroepen bij een decoder-initialisatiefout; de host beslist over het vervolg. */
+        /** Called on a decoder initialization failure; the host decides what happens next. */
         fun onDecoderInitFailure(controller: StreamController): DecoderDecision
 
         fun onStatusChanged(controller: StreamController) {}
     }
 
     enum class DecoderDecision {
-        /** Andere spelers zijn vrijgegeven; probeer de actieve camera direct opnieuw. */
+        /** Other players have been released; retry the active camera immediately. */
         RETRY_NOW,
 
-        /** Er waren geen andere spelers: het is een echte codec-/decoderfout. */
+        /** There were no other players: it is a real codec/decoder error. */
         GIVE_UP,
 
-        /** De host heeft deze (voorgeladen) controller zelf al losgekoppeld. */
+        /** The host has already detached this (preloaded) controller itself. */
         DETACHED,
     }
 
@@ -77,12 +76,12 @@ class StreamController(
 
     private val _status = MutableStateFlow(StreamStatus(camera.id, camera.name))
 
-    /** Wordt bijgewerkt bij elke toestandsovergang (niet per frame; gebruik [snapshot] voor live waarden). */
+    /** Updated on every state transition (not per frame; use [snapshot] for live values). */
     val status: StateFlow<StreamStatus> = _status.asStateFlow()
 
     private val _player = MutableStateFlow<StreamPlayer?>(null)
 
-    /** Huidige spelerinstantie (alleen binnen het venster), voor koppeling aan de video-view. */
+    /** Current player instance (only inside the window), for attaching to the video view. */
     val player: StateFlow<StreamPlayer?> = _player.asStateFlow()
 
     private var phase = Phase.IDLE
@@ -121,20 +120,20 @@ class StreamController(
     val isError: Boolean get() = phase == Phase.ERROR
     val isPlaying: Boolean get() = phase == Phase.PLAYING
 
-    /** True als er nu een reconnect-timer loopt (voor tests: nooit meer dan één). */
+    /** True when a reconnect timer is currently running (for tests: never more than one). */
     val hasPendingReconnect: Boolean get() = reconnectJob?.isActive == true
 
     // ------------------------------------------------------------------------------------
-    // Publieke API (aangeroepen door StreamManager)
+    // Public API (called by StreamManager)
     // ------------------------------------------------------------------------------------
 
-    /** Koppel aan het spelervenster met de gegeven rol, of wijzig alleen de rol als al gekoppeld. */
+    /** Attach to the player window with the given role, or only change the role if already attached. */
     fun attach(newRole: PlayerRole) {
-        check(!disposed) { "controller is vrijgegeven" }
+        check(!disposed) { "controller has been disposed" }
         val previous = role
         role = newRole
         if (phase == Phase.ERROR) {
-            // Permanente fout: geen speler (en geen decoder) gebruiken tot een expliciete retry.
+            // Permanent error: do not use a player (or a decoder) until an explicit retry.
             applyAudio()
             publish()
             return
@@ -154,14 +153,14 @@ class StreamController(
         connect("attach")
     }
 
-    /** Schakel naar de stream die bij de huidige rol hoort (main of sub), als dat nog niet zo is. */
+    /** Switch to the stream that belongs to the current role (main or sub), if not already. */
     fun ensurePreferredStream() {
         val r = role ?: return
         if (phase == Phase.ERROR || phase == Phase.IDLE) return
         if (kind != camera.kindFor(r)) switchStream("role_stream_preference")
     }
 
-    /** Ontkoppel van het venster: speler volledig vrijgeven, alle timers stoppen. */
+    /** Detach from the window: fully release the player, stop all timers. */
     fun detach(reason: String) {
         if (role == null && playerInstance == null && phase != Phase.ERROR) return
         if (role != null || playerInstance != null) log.i(tag, "event=detach reason=$reason")
@@ -201,7 +200,7 @@ class StreamController(
         }
     }
 
-    /** Handmatige (of lifecycle-)retry na een permanente fout. */
+    /** Manual (or lifecycle) retry after a permanent error. */
     fun retry(reason: String = "manual_retry") {
         if (disposed) return
         val wasError = phase == Phase.ERROR
@@ -244,7 +243,7 @@ class StreamController(
         publish()
     }
 
-    /** Opnieuw verbinden omdat bv. de RTSP-credentials gewijzigd zijn. */
+    /** Reconnect because e.g. the RTSP credentials changed. */
     fun reconnectNow(reason: String) {
         if (role == null || phase == Phase.ERROR || phase == Phase.IDLE) return
         attempt = 0
@@ -264,7 +263,7 @@ class StreamController(
         scope.cancel()
     }
 
-    /** Actuele status, inclusief live waarden zoals het tijdstip van het laatste frame. */
+    /** Current status, including live values such as the time of the last frame. */
     fun snapshot(): StreamStatus {
         val now = clock.elapsedMs()
         val offline = outageSince?.let { now - it >= config.offlineThresholdMs } ?: false
@@ -348,7 +347,7 @@ class StreamController(
         connectTimeoutJob = scope.launch {
             delay(timeout)
             if (session == s && phase == Phase.CONNECTING) {
-                onFailure(PlayerFailure(ErrorCategory.CONNECT_TIMEOUT, "geen beeld binnen ${timeout / 1000} s"), s)
+                onFailure(PlayerFailure(ErrorCategory.CONNECT_TIMEOUT, "no video within ${timeout / 1000} s"), s)
             }
         }
         ensureWatchdog()
@@ -361,7 +360,7 @@ class StreamController(
             log.i(tag, "event=stream_switch reason=$reason from=$kind to=${role?.let { camera.kindFor(it) }}")
             connect(reason)
         }
-        // In WAITING kiest de volgende poging automatisch de juiste stream.
+        // In WAITING the next attempt automatically picks the right stream.
     }
 
     private fun onFrameProgress() {
@@ -412,7 +411,7 @@ class StreamController(
         }
         when {
             cat == ErrorCategory.UNSUPPORTED_AUDIO_CODEC && !audioDisabled -> {
-                // Video moet blijven werken: opnieuw verbinden zonder audiotrack.
+                // Video must keep working: reconnect without the audio track.
                 audioDisabled = true
                 audioUnsupported = true
                 log.w(tag, "event=audio_disabled reason=unsupported_audio_codec")
@@ -434,7 +433,7 @@ class StreamController(
                         return
                     }
                     DecoderDecision.GIVE_UP -> {
-                        enterError(cat, failure.detail.ifBlank { "decoder start niet, ook zonder andere spelers" })
+                        enterError(cat, failure.detail.ifBlank { "decoder does not start, even without other players" })
                         return
                     }
                 }
@@ -446,7 +445,7 @@ class StreamController(
             cat.isCodecRelated -> {
                 codecFailures++
                 if (codecFailures >= config.maxCodecFailures) {
-                    enterError(ErrorCategory.CODEC_PERMANENT, "$codecFailures keer ${cat.label.lowercase()} zonder beeld")
+                    enterError(ErrorCategory.CODEC_PERMANENT, "$codecFailures times ${cat.description.lowercase()} without video")
                     return
                 }
             }
@@ -485,7 +484,7 @@ class StreamController(
         stableJob?.cancel(); stableJob = null
         playerInstance?.stop()
         buffering = false
-        if (phase == Phase.PLAYING || phase == Phase.CONNECTING) session++ // negeer late callbacks
+        if (phase == Phase.PLAYING || phase == Phase.CONNECTING) session++ // ignore late callbacks
         phase = Phase.WAITING
         nextAttemptAt = null
         currentBackoff = null
@@ -510,7 +509,7 @@ class StreamController(
     }
 
     // ------------------------------------------------------------------------------------
-    // Watchdog en timers
+    // Watchdog and timers
     // ------------------------------------------------------------------------------------
 
     private fun ensureWatchdog() {
@@ -534,11 +533,11 @@ class StreamController(
         if (phase == Phase.PLAYING && config.watchdogEnabled) {
             val now = clock.elapsedMs()
             val since = now - (lastFrameElapsed ?: now)
-            // Kort bufferen is normaal; geef dan iets meer ruimte, maar nooit oneindig.
+            // Brief buffering is normal; allow a bit more time then, but never indefinitely.
             val limit = if (buffering) config.watchdogTimeoutMs * 2 else config.watchdogTimeoutMs
             if (since >= limit) {
                 log.w(tag, "event=watchdog_triggered no_frame_ms=$since limit_ms=$limit buffering=$buffering")
-                onFailure(PlayerFailure(ErrorCategory.STALLED, "${since / 1000} s geen nieuw frame"), session)
+                onFailure(PlayerFailure(ErrorCategory.STALLED, "no new frame for ${since / 1000} s"), session)
             }
         }
     }

@@ -21,21 +21,27 @@ import io.github.rutgersmit.frigastreamer.util.Logger
 
 data class RefreshStatus(
     val inProgress: Boolean = false,
+    /** null = not fetched yet, true = last refresh succeeded, false = last refresh failed. */
     val ok: Boolean? = null,
-    val message: String = "Nog niet opgehaald",
+    /** True when no Frigate host has been configured yet. */
+    val notConfigured: Boolean = false,
+    /** Technical error detail of the last failed refresh (English, not localized). */
+    val errorDetail: String? = null,
+    /** True when `/api/config` could not be read and only go2rtc stream names were used. */
+    val configUnavailable: Boolean = false,
     val streamCount: Int = 0,
     val cameraCount: Int = 0,
     val unmatched: List<UnmatchedCamera> = emptyList(),
     val lastAttemptWallMs: Long? = null,
     val lastSuccessWallMs: Long? = null,
-    /** True als de getoonde lijst uit de cache komt omdat Frigate (nog) niet bereikbaar was. */
+    /** True when the list shown comes from the cache because Frigate was not reachable (yet). */
     val usingCache: Boolean = true,
 )
 
 /**
- * Bron van de cameralijst: automatisch (go2rtc + config) aangevuld met handmatige camera's
- * en gebruikersaanpassingen. De laatst bekende automatische lijst wordt in DataStore bewaard
- * en gebruikt zolang Frigate onbereikbaar is.
+ * Source of the camera list: automatic (go2rtc + config), supplemented with manual cameras
+ * and user overrides. The last known automatic list is persisted in DataStore and used
+ * while Frigate is unreachable.
  */
 class CameraRepository(
     private val settings: SettingsRepository,
@@ -51,7 +57,7 @@ class CameraRepository(
     private val autoCameras: Flow<List<AutoCamera>> =
         combine(liveAuto, settings.cachedAutoCameras) { live, cache -> live ?: cache }
 
-    /** Alle camera's, inclusief verborgen, in de ingestelde volgorde. */
+    /** All cameras, including hidden ones, in the configured order. */
     val entries: Flow<List<CameraEntry>> = combine(settings.settings, settings.cameraConfig, autoCameras) { s, cfg, auto ->
         val endpoint = if (s.host.isNotBlank()) RtspEndpoint(s.host.trim(), s.rtspPort) else null
         CameraListBuilder.build(auto, cfg, endpoint)
@@ -60,22 +66,21 @@ class CameraRepository(
     suspend fun refresh(reason: String): RefreshStatus = mutex.withLock {
         val s = settings.current()
         if (s.host.isBlank()) {
-            return@withLock RefreshStatus(ok = false, message = "Stel eerst het IP-adres van Frigate in").also { _status.value = it }
+            return@withLock RefreshStatus(ok = false, notConfigured = true).also { _status.value = it }
         }
         _status.value = _status.value.copy(inProgress = true)
         val now = clock.wallMs()
         log.i(TAG, "event=camera_list_refresh reason=$reason")
         val streams = try {
             client.fetchStreamNames().also {
-                // Een lege lijst komt in de praktijk voor tijdens een (her)start van go2rtc.
-                // Behandel dat als storing, zodat de laatst bekende lijst behouden blijft.
-                if (it.isEmpty()) throw FrigateApiException("go2rtc meldt (nog) geen streams")
+                // An empty list happens in practice while go2rtc is (re)starting.
+                // Treat it as a failure, so the last known list is kept.
+                if (it.isEmpty()) throw FrigateApiException("go2rtc reports no streams (yet)")
             }
         } catch (e: Exception) {
-            val msg = "Frigate-API onbereikbaar: ${e.message ?: e.javaClass.simpleName}"
             log.w(TAG, "event=camera_list_refresh_failed using_cache=true error=${e.javaClass.simpleName}")
             return@withLock _status.value.copy(
-                inProgress = false, ok = false, message = msg, lastAttemptWallMs = now, usingCache = true,
+                inProgress = false, ok = false, errorDetail = e.message ?: e.javaClass.simpleName, lastAttemptWallMs = now, usingCache = true,
             ).also { _status.value = it }
         }
         val configs = try {
@@ -89,14 +94,9 @@ class CameraRepository(
         for (c in result.cameras) log.d(TAG, "event=camera_mapped camera=${c.name} main=${c.mainStream} sub=${c.subStream ?: "-"}")
         liveAuto.value = result.cameras
         settings.saveAutoCameras(result.cameras)
-        val msg = buildString {
-            append("${streams.size} go2rtc-streams, ${result.cameras.size} camera's")
-            if (configs == null) append(" (config niet beschikbaar: alleen streamnamen gebruikt)")
-            if (result.unmatched.isNotEmpty()) append(", ${result.unmatched.size} zonder stream")
-        }
         log.i(TAG, "event=camera_list_refreshed streams=${streams.size} cameras=${result.cameras.size} unmatched=${result.unmatched.size}")
         RefreshStatus(
-            inProgress = false, ok = true, message = msg, streamCount = streams.size,
+            inProgress = false, ok = true, configUnavailable = configs == null, streamCount = streams.size,
             cameraCount = result.cameras.size, unmatched = result.unmatched,
             lastAttemptWallMs = now, lastSuccessWallMs = now, usingCache = false,
         ).also { _status.value = it }

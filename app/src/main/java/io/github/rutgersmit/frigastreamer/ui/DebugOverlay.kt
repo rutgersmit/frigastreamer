@@ -17,7 +17,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.rutgersmit.frigastreamer.BuildConfig
 import io.github.rutgersmit.frigastreamer.stream.StreamState
 
-/** Debug-overlay: het belangrijkste hulpmiddel bij testen op de echte tablet. */
+/**
+ * Debug overlay: the main tool when testing on the real tablet.
+ * Developer diagnostics only, so deliberately English and not localized.
+ */
 @Composable
 fun DebugOverlay(vm: MainViewModel, modifier: Modifier = Modifier) {
     val now by rememberTicker(500)
@@ -29,11 +32,11 @@ fun DebugOverlay(vm: MainViewModel, modifier: Modifier = Modifier) {
     val lines = buildList {
         add("FrigaStreamer ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         add(
-            "spelers: ${state.playerCount}/3 (max gezien ${vm.manager.maxObservedPlayers})  " +
-                "preload: ${state.effectivePreload} (ingesteld ${state.configuredPreload}${if (state.autoReduced) ", AUTO VERKLEIND" else ""})",
+            "players: ${state.playerCount}/3 (max seen ${vm.manager.maxObservedPlayers})  " +
+                "preload: ${state.effectivePreload} (configured ${state.configuredPreload}${if (state.autoReduced) ", AUTO-REDUCED" else ""})",
         )
-        add("netwerk: ${if (network.available) "ok" else "WEG"} [${network.description}]  frigate api=${health.api} rtsp=${health.rtsp}")
-        add("actief: ${state.activeIndex + 1}/${state.cameras.size}  gestart=${state.started}  mute=${state.muted}  t=${now / 1000}")
+        add("network: ${if (network.available) "ok" else "DOWN"} [${network.description}]  frigate api=${health.api} rtsp=${health.rtsp}")
+        add("active: ${state.activeIndex + 1}/${state.cameras.size}  started=${state.started}  mute=${state.muted}  t=${now / 1000}")
         controllers.values.map { it.snapshot() }.filter { it.role != null || it.hasPlayer || it.state is StreamState.Error }.forEach { s ->
             val since = s.lastFrameElapsedMs?.let { "${(now - it).coerceAtLeast(0)}ms" } ?: "-"
             val st = when (val x = s.state) {
@@ -49,7 +52,7 @@ fun DebugOverlay(vm: MainViewModel, modifier: Modifier = Modifier) {
                     is StreamState.Offline -> x.nextAttemptAtMs
                     else -> null
                 }?.let { ((it - now).coerceAtLeast(0) / 100) / 10.0 }
-                " backoff=${b / 1000}s volgende=${left ?: "-"}s"
+                " backoff=${b / 1000}s next=${left ?: "-"}s"
             } ?: ""
             val track = s.trackInfo?.let { " ${it.videoMime?.removePrefix("video/") ?: "?"} ${it.width}x${it.height}${if (!it.audioSupported) " audio✗" else ""}" } ?: ""
             add("• ${s.cameraName} [${s.role ?: "-"}] ${s.kind ?: "-"} p#${s.playerInstanceId ?: "-"} $st frame=$since$next$track${if (s.buffering) " buf" else ""} n=${s.totalConnects}")

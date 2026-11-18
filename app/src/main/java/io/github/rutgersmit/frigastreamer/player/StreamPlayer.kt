@@ -25,30 +25,30 @@ data class TrackInfo(
 data class PlayerFailure(val category: ErrorCategory, val detail: String)
 
 /**
- * Abstractie van een videospeler voor één camera. De echte implementatie is [ExoStreamPlayer];
- * tests gebruiken een fake. Alle methodes en callbacks lopen op de main thread.
+ * Abstraction of a video player for one camera. The real implementation is [ExoStreamPlayer];
+ * tests use a fake. All methods and callbacks run on the main thread.
  */
 interface StreamPlayer {
-    /** Uniek per instantie (voor logging en debug-overlay). */
+    /** Unique per instance (for logging and the debug overlay). */
     val instanceId: Int
 
     fun setListener(listener: Listener?)
 
-    /** Start (of herstart) de stream. Een eerdere stream wordt eerst gestopt. */
+    /** Starts (or restarts) the stream. A previous stream is stopped first. */
     fun start(source: StreamSource)
 
-    /** Stopt de stream en sluit de RTSP-verbinding; het laatste beeld blijft staan. */
+    /** Stops the stream and closes the RTSP connection; the last frame stays visible. */
     fun stop()
 
     fun setMuted(muted: Boolean)
 
     /**
-     * Monotone teller die oploopt zolang er videoframes gedecodeerd/gerenderd worden.
-     * De frame-watchdog vergelijkt opeenvolgende waarden.
+     * Monotonic counter that increases while video frames are being decoded/rendered.
+     * The frame watchdog compares successive values.
      */
     fun frameCounter(): Long
 
-    /** Geeft alle resources (decoder, sockets, threads) definitief vrij. */
+    /** Permanently releases all resources (decoder, sockets, threads). */
     fun release()
 
     interface Listener {

@@ -26,8 +26,8 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 private data class CachedAutoCamera(val name: String, val main: String, val sub: String? = null)
 
 /**
- * Alle persistente instellingen via Jetpack DataStore. Credentials staan bewust gewoon in
- * DataStore (LAN-app op een eigen apparaat; geen Keystore/EncryptedSharedPreferences).
+ * All persistent settings via Jetpack DataStore. Credentials are deliberately stored plainly in
+ * DataStore (LAN app on a personal device; no Keystore/EncryptedSharedPreferences).
  */
 class SettingsRepository(private val context: Context) {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }

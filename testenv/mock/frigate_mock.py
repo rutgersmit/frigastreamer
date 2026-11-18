@@ -21,8 +21,8 @@ USER = os.environ.get("MOCK_USER", "admin")
 PASSWORD = os.environ.get("MOCK_PASSWORD", "admin")
 TOKEN_TTL = int(os.environ.get("TOKEN_TTL", "300"))
 CONFIG = json.load(open(os.path.join(os.path.dirname(__file__), "frigate_config.json")))
-FALLBACK = ["voordeur", "voordeur_sub", "tuin", "tuin_sub", "oprit", "garage", "deurbel", "schuur",
-            "snel_gop", "traag_gop", "achterdeur", "carport", "carport_sub"]
+FALLBACK = ["front_door", "front_door_sub", "garden", "garden_sub", "driveway", "garage", "doorbell", "shed",
+            "fast_gop", "slow_gop", "back_door", "carport", "carport_sub"]
 tokens = {}
 lock = threading.Lock()
 

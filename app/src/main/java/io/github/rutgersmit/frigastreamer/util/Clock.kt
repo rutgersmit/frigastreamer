@@ -1,11 +1,11 @@
 package io.github.rutgersmit.frigastreamer.util
 
-/** Injecteerbare klok, zodat backoff, watchdog en offline-drempel in tests virtuele tijd gebruiken. */
+/** Injectable clock, so backoff, watchdog and offline threshold use virtual time in tests. */
 interface Clock {
-    /** Monotone tijd in milliseconden (verstrijkt ook in standby), voor timers en intervallen. */
+    /** Monotonic time in milliseconds (also advances during standby), for timers and intervals. */
     fun elapsedMs(): Long
 
-    /** Wandklok in milliseconden sinds epoch, alleen voor weergave (bv. tijdstip laatste frame). */
+    /** Wall clock in milliseconds since epoch, for display only (e.g. time of the last frame). */
     fun wallMs(): Long
 }
 

@@ -33,15 +33,15 @@ class ManagerHarness(val scope: TestScope, cameraCount: Int, preload: Int, confi
     fun ctrl(i: Int) = manager.controller(cameras[i].id)!!
     fun state(i: Int) = ctrl(i).status.value.state
 
-    /** Controleert de invarianten die altijd moeten gelden. */
+    /** Checks the invariants that must always hold. */
     fun assertInvariants() {
         val live = factory.live
-        assertTrue("max 3 spelers, was ${live.size}", live.size <= PlayerWindow.MAX_PLAYERS)
+        assertTrue("max 3 players, was ${live.size}", live.size <= PlayerWindow.MAX_PLAYERS)
         val perCamera = live.groupBy { it.cameraId }
-        assertTrue("dubbele speler voor een camera: $perCamera", perCamera.values.all { it.size == 1 })
-        assertEquals("geen lekken: aangemaakt - vrijgegeven = levend", factory.created.size - factory.created.count { it.released }, live.size)
+        assertTrue("duplicate player for a camera: $perCamera", perCamera.values.all { it.size == 1 })
+        assertEquals("no leaks: created - released = alive", factory.created.size - factory.created.count { it.released }, live.size)
         assertEquals(live.size, manager.playerCount)
-        // Elke controller met speler hoort in het venster te zitten.
+        // Every controller with a player must be inside the window.
         for (c in manager.controllerMap.value.values) if (c.hasPlayer) assertTrue(c.role != null)
     }
 
@@ -55,12 +55,12 @@ class ManagerHarness(val scope: TestScope, cameraCount: Int, preload: Int, confi
 class StreamManagerTest {
 
     @Test
-    fun `preload 1 - actieve camera main, volgende camera sub en gemute`() = runTest {
+    fun `preload 1 - active camera main, next camera sub and muted`() = runTest {
         val h = ManagerHarness(this, 10, 1)
         h.manager.setMuted(false)
         h.manager.start()
         advance(100)
-        assertEquals("buren wachten tot de actieve camera beeld heeft", 1, h.factory.live.size)
+        assertEquals("neighbours wait until the active camera has video", 1, h.factory.live.size)
         advance(1_000)
         assertEquals(2, h.factory.live.size)
         val active = h.factory.liveFor("auto:cam0").single()
@@ -74,7 +74,7 @@ class StreamManagerTest {
     }
 
     @Test
-    fun `preload 2 en preload 0`() = runTest {
+    fun `preload 2 and preload 0`() = runTest {
         val h = ManagerHarness(this, 10, 2)
         h.manager.start()
         advance(2_000)
@@ -87,13 +87,13 @@ class StreamManagerTest {
     }
 
     @Test
-    fun `voorgeladen camera wordt actief zonder nieuwe speler en schakelt naar main`() = runTest {
+    fun `preloaded camera becomes active without a new player and switches to main`() = runTest {
         val h = ManagerHarness(this, 5, 1)
         h.manager.start()
         advance(2_000)
         val preloaded = h.factory.liveFor("auto:cam1").single()
         h.manager.setActiveIndex(1)
-        assertEquals("cam0 valt buiten het venster", 0, h.factory.liveFor("auto:cam0").size)
+        assertEquals("cam0 falls outside the window", 0, h.factory.liveFor("auto:cam0").size)
         assertEquals(preloaded, h.factory.liveFor("auto:cam1").single())
         assertEquals(StreamKind.MAIN, preloaded.source!!.kind)
         advance(2_000)
@@ -102,7 +102,7 @@ class StreamManagerTest {
     }
 
     @Test
-    fun `randgevallen 1 en 2 camera's`() = runTest {
+    fun `edge cases 1 and 2 cameras`() = runTest {
         val one = ManagerHarness(this, 1, 2)
         one.manager.start()
         advance(5_000)
@@ -120,13 +120,13 @@ class StreamManagerTest {
         }
         advance(5_000)
         assertEquals(2, two.factory.live.size)
-        assertEquals("bij 2 camera's wisselen ze alleen van rol", 2, two.factory.created.size)
+        assertEquals("with 2 cameras they only swap roles", 2, two.factory.created.size)
         one.manager.dispose()
         two.manager.dispose()
     }
 
     @Test
-    fun `decoder-initialisatiefout op preload raakt actieve camera niet en verkleint het venster`() = runTest {
+    fun `decoder initialization failure on preload does not affect active camera and shrinks the window`() = runTest {
         val h = ManagerHarness(this, 6, 2)
         h.server.maxDecoders = 2
         h.manager.start()
@@ -137,7 +137,7 @@ class StreamManagerTest {
         assertEquals(1, h.log.count("preload_window_reduced"))
         assertEquals(2, h.factory.live.size)
         h.assertInvariants()
-        // Verder swipen gebruikt het verkleinde venster.
+        // Further swiping uses the reduced window.
         h.manager.setActiveIndex(3)
         advance(5_000)
         assertEquals(2, h.factory.live.size)
@@ -146,26 +146,26 @@ class StreamManagerTest {
     }
 
     @Test
-    fun `decoder-initialisatiefout op actieve camera - eerst preloads vrijgeven en opnieuw proberen`() = runTest {
+    fun `decoder initialization failure on active camera - release preloads first and retry`() = runTest {
         val h = ManagerHarness(this, 3, 1)
         h.manager.start()
         advance(3_000)
         assertEquals(2, h.factory.live.size)
-        // Decoderlimiet daalt (bv. andere app gebruikt een decoder) en de actieve stream valt even weg.
+        // Decoder limit drops (e.g. another app uses a decoder) and the active stream briefly drops out.
         h.server.maxDecoders = 1
         h.server.down += "cam0"
         advance(1_300)
         h.server.down.clear()
         advance(5_000)
         assertEquals(StreamState.Playing, h.state(0))
-        assertFalse("preload vrijgegeven", h.ctrl(1).hasPlayer)
+        assertFalse("preload released", h.ctrl(1).hasPlayer)
         assertEquals(0, h.manager.effectivePreload)
         assertTrue(h.log.count("release_preloads_for_active") >= 1)
         h.assertInvariants()
     }
 
     @Test
-    fun `decoder-initialisatiefout zonder andere spelers wordt codecfout, andere camera's blijven werken`() = runTest {
+    fun `decoder initialization failure without other players becomes codec error, other cameras keep working`() = runTest {
         val h = ManagerHarness(this, 3, 0)
         h.server.failures["cam0"] = ErrorCategory.DECODER_INIT
         h.manager.start()
@@ -179,7 +179,7 @@ class StreamManagerTest {
     }
 
     @Test
-    fun `netwerkherstel - actieve camera eerst`() = runTest {
+    fun `network recovery - active camera first`() = runTest {
         val h = ManagerHarness(this, 4, 1)
         h.manager.start()
         advance(3_000)
@@ -197,12 +197,12 @@ class StreamManagerTest {
     }
 
     @Test
-    fun `verwijderde camera wordt opgeruimd, nieuwe toegevoegd, actieve blijft behouden`() = runTest {
+    fun `removed camera is cleaned up, new one added, active one kept`() = runTest {
         val h = ManagerHarness(this, 4, 1)
         h.manager.start()
         h.manager.setActiveIndex(2)
         advance(2_000)
-        val newList = listOf(h.cameras[2], h.cameras[3], cam("nieuw"))
+        val newList = listOf(h.cameras[2], h.cameras[3], cam("new"))
         h.manager.setCameras(newList)
         advance(2_000)
         assertEquals("auto:cam2", h.manager.activeCamera()!!.id)
@@ -212,7 +212,7 @@ class StreamManagerTest {
     }
 
     @Test
-    fun `laatst bekeken camera wordt bij start gekozen`() = runTest {
+    fun `last viewed camera is chosen on start`() = runTest {
         val h = ManagerHarness(this, 1, 1)
         val cams = (0 until 5).map { cam("c$it") }
         h.manager.setCameras(cams, preferActiveId = "auto:c3")

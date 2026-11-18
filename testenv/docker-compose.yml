@@ -3,7 +3,7 @@
 #   cd testenv && docker compose up -d
 #
 # - mediamtx      : RTSP-server op :8554 (speelt de rol van go2rtc) met >= 10 testpatroonstreams
-# - cam-voordeur  : apart ffmpeg-proces voor 'voordeur' + 'voordeur_sub', zodat je deze ene
+# - cam-front-door  : apart ffmpeg-proces voor 'front_door' + 'front_door_sub', zodat je deze ene
 #                   camera kunt stoppen (docker compose stop) of bevriezen (docker compose pause)
 # - frigate-mock  : bootst /api/go2rtc/streams, /api/config, /api/version en /api/login na
 #                   op :5000 (intern, zonder auth) en :8971 (met login, HTTP i.p.v. HTTPS)
@@ -21,9 +21,9 @@ services:
     volumes:
       - ./mediamtx.yml:/mediamtx.yml:ro
 
-  cam-voordeur:
+  cam-front-door:
     image: bluenviron/mediamtx:1.21.4-ffmpeg
-    container_name: fs-cam-voordeur
+    container_name: fs-cam-front-door
     restart: unless-stopped
     depends_on: [mediamtx]
     entrypoint: ["/bin/sh", "-c"]
@@ -36,9 +36,9 @@ services:
         -f lavfi -i sine=frequency=440:sample_rate=48000
         -filter_complex "[0:v]split=2[m][s];[s]scale=640:360[sv]"
         -map "[m]" -map 1:a -c:v libx264 -preset ultrafast -tune zerolatency -g 25 -c:a aac -b:a 64k
-        -f rtsp -rtsp_transport tcp rtsp://mediamtx:8554/voordeur
+        -f rtsp -rtsp_transport tcp rtsp://mediamtx:8554/front_door
         -map "[sv]" -c:v libx264 -preset ultrafast -tune zerolatency -g 25 -an
-        -f rtsp -rtsp_transport tcp rtsp://mediamtx:8554/voordeur_sub;
+        -f rtsp -rtsp_transport tcp rtsp://mediamtx:8554/front_door_sub;
         sleep 2; done
 
   frigate-mock:

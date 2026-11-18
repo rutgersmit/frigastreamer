@@ -6,17 +6,17 @@ import io.github.rutgersmit.frigastreamer.domain.StreamKind
 import io.github.rutgersmit.frigastreamer.player.TrackInfo
 
 /**
- * Zichtbare toestand van een camera. Overgangen (zie [StreamController]):
+ * Visible state of a camera. Transitions (see [StreamController]):
  *
  * ```
- * Idle ──attach──▶ Connecting ──eerste frame──▶ Playing
- *                    │  ▲                          │ fout / watchdog / netwerkverlies
- *                    │  └──────backoff-timer───────┤
+ * Idle ──attach──▶ Connecting ──first frame──▶ Playing
+ *                    │  ▲                          │ error / watchdog / network loss
+ *                    │  └──────backoff timer───────┤
  *                    ▼                             ▼
  *                Reconnecting ◀────────────────────┘
- *    (Connecting/Reconnecting langer dan offline-drempel) ⇒ Offline  (reconnect loopt door)
- *    permanente fout (codec/auth) ⇒ Error  (geen automatische reconnects)
- *    detach (buiten venster / app naar achtergrond) ⇒ Idle
+ *    (Connecting/Reconnecting longer than offline threshold) ⇒ Offline  (reconnect keeps running)
+ *    permanent error (codec/auth) ⇒ Error  (no automatic reconnects)
+ *    detach (outside window / app to background) ⇒ Idle
  * ```
  */
 sealed interface StreamState {
@@ -26,10 +26,10 @@ sealed interface StreamState {
 
     data object Playing : StreamState
 
-    /** [nextAttemptAtMs] = null betekent: wachten tot het netwerk terug is. */
+    /** [nextAttemptAtMs] = null means: waiting for the network to come back. */
     data class Reconnecting(val attempt: Int, val nextAttemptAtMs: Long?, val reason: ErrorCategory) : StreamState
 
-    /** Langer dan de offline-drempel geen beeld. De reconnect-logica blijft actief. */
+    /** No frames for longer than the offline threshold. The reconnect logic stays active. */
     data class Offline(
         val attempt: Int,
         val nextAttemptAtMs: Long?,

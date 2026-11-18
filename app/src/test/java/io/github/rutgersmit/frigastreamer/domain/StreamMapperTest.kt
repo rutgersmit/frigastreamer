@@ -9,85 +9,92 @@ class StreamMapperTest {
     private val pattern = SubstreamPattern(SubstreamPattern.DEFAULT)
 
     @Test
-    fun `stream met cameranaam is main, camera_sub is substream`() {
+    fun `stream with camera name is main, camera_sub is substream`() {
         val r = StreamMapper.map(
-            listOf("voordeur", "voordeur_sub", "tuin"),
-            listOf(FrigateCameraConfig("voordeur"), FrigateCameraConfig("tuin")),
+            listOf("front_door", "front_door_sub", "garden"),
+            listOf(FrigateCameraConfig("front_door"), FrigateCameraConfig("garden")),
             pattern,
         )
         assertEquals(
-            listOf(AutoCamera("voordeur", "voordeur", "voordeur_sub"), AutoCamera("tuin", "tuin", null)),
+            listOf(AutoCamera("front_door", "front_door", "front_door_sub"), AutoCamera("garden", "garden", null)),
             r.cameras,
         )
         assertTrue(r.unmatched.isEmpty())
     }
 
     @Test
-    fun `losse streams worden losse camera's, met eigen sub-variant`() {
+    fun `standalone streams become standalone cameras, with their own sub variant`() {
         val r = StreamMapper.map(
-            listOf("voordeur", "garage", "garage_sub", "extra_sub"),
-            listOf(FrigateCameraConfig("voordeur")),
+            listOf("front_door", "garage", "garage_sub", "extra_sub"),
+            listOf(FrigateCameraConfig("front_door")),
             pattern,
         )
         assertEquals(AutoCamera("garage", "garage", "garage_sub"), r.cameras.first { it.name == "garage" })
-        // "extra_sub" zonder "extra" blijft gewoon een losse camera.
+        // "extra_sub" without "extra" simply stays a standalone camera.
         assertEquals(AutoCamera("extra_sub", "extra_sub", null), r.cameras.first { it.name == "extra_sub" })
         assertEquals(3, r.cameras.size)
     }
 
     @Test
-    fun `camera zonder go2rtc-stream wordt niet getoond maar wel gemeld`() {
+    fun `camera without go2rtc stream is not shown but is reported`() {
         val r = StreamMapper.map(
-            listOf("voordeur"),
+            listOf("front_door"),
             listOf(
-                FrigateCameraConfig("voordeur"),
-                FrigateCameraConfig("schuur", inputs = listOf(InputRef("bestaatniet", listOf("record")))),
-                FrigateCameraConfig("oud"),
-                FrigateCameraConfig("uit", enabled = false),
+                FrigateCameraConfig("front_door"),
+                FrigateCameraConfig("shed", inputs = listOf(InputRef("does_not_exist", listOf("record")))),
+                FrigateCameraConfig("old"),
+                FrigateCameraConfig("off", enabled = false),
             ),
             pattern,
         )
-        assertEquals(listOf("voordeur"), r.cameras.map { it.name })
-        assertEquals(setOf("schuur", "oud", "uit"), r.unmatched.map { it.name }.toSet())
+        assertEquals(listOf("front_door"), r.cameras.map { it.name })
+        assertEquals(
+            mapOf(
+                "shed" to UnmatchReason.REFERENCED_STREAMS_MISSING,
+                "old" to UnmatchReason.NO_GO2RTC_STREAM,
+                "off" to UnmatchReason.DISABLED,
+            ),
+            r.unmatched.associate { it.name to it.reason },
+        )
     }
 
     @Test
-    fun `koppeling via config-inputs en rollen als namen afwijken`() {
+    fun `mapping via config inputs and roles when names differ`() {
         val cam = FrigateCameraConfig(
-            "deurbel",
+            "doorbell",
             inputs = listOf(
                 InputRef("reolink_main", listOf("record")),
                 InputRef("reolink_ext", listOf("detect")),
             ),
         )
         val r = StreamMapper.map(listOf("reolink_main", "reolink_ext"), listOf(cam), pattern)
-        assertEquals(listOf(AutoCamera("deurbel", "reolink_main", "reolink_ext")), r.cameras)
+        assertEquals(listOf(AutoCamera("doorbell", "reolink_main", "reolink_ext")), r.cameras)
     }
 
     @Test
-    fun `live streams uit config (Frigate 0_16) bepalen de main stream`() {
-        val cam = FrigateCameraConfig("tuin", liveStreams = listOf("tuin_hd", "tuin_low"))
-        val r = StreamMapper.map(listOf("tuin_hd", "tuin_low"), listOf(cam), pattern)
-        assertEquals(listOf(AutoCamera("tuin", "tuin_hd", "tuin_low")), r.cameras)
+    fun `live streams from config (Frigate 0_16) determine the main stream`() {
+        val cam = FrigateCameraConfig("garden", liveStreams = listOf("garden_hd", "garden_low"))
+        val r = StreamMapper.map(listOf("garden_hd", "garden_low"), listOf(cam), pattern)
+        assertEquals(listOf(AutoCamera("garden", "garden_hd", "garden_low")), r.cameras)
     }
 
     @Test
-    fun `instelbaar substream-patroon`() {
+    fun `configurable substream pattern`() {
         val p = SubstreamPattern("{camera}-low")
-        val r = StreamMapper.map(listOf("oprit", "oprit-low", "oprit_sub"), listOf(FrigateCameraConfig("oprit")), p)
-        assertEquals(AutoCamera("oprit", "oprit", "oprit-low"), r.cameras.first())
-        // oprit_sub past niet in dit patroon en wordt een losse camera.
-        assertEquals(listOf("oprit", "oprit_sub"), r.cameras.map { it.name })
+        val r = StreamMapper.map(listOf("driveway", "driveway-low", "driveway_sub"), listOf(FrigateCameraConfig("driveway")), p)
+        assertEquals(AutoCamera("driveway", "driveway", "driveway-low"), r.cameras.first())
+        // driveway_sub does not match this pattern and becomes a standalone camera.
+        assertEquals(listOf("driveway", "driveway_sub"), r.cameras.map { it.name })
     }
 
     @Test
-    fun `zonder config worden streams alleen op naam gekoppeld`() {
+    fun `without config streams are mapped by name only`() {
         val r = StreamMapper.map(listOf("a", "a_sub", "b"), emptyList(), pattern)
         assertEquals(listOf(AutoCamera("a", "a", "a_sub"), AutoCamera("b", "b", null)), r.cameras)
     }
 
     @Test
-    fun `substream-patroon parsing`() {
+    fun `substream pattern parsing`() {
         val p = SubstreamPattern("<camera>_sub")
         assertEquals("x_sub", p.subNameFor("x"))
         assertEquals("x", p.mainNameFor("x_sub"))

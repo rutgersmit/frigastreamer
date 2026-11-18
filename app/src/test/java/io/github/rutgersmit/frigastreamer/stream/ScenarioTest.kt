@@ -10,13 +10,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * De praktijkscenario's uit de opdracht (sectie 13), gesimuleerd met fakes en virtuele tijd.
+ * The real-world scenarios from the assignment (section 13), simulated with fakes and virtual time.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScenarioTest {
 
     @Test
-    fun `1 - Frigate 60 seconden onbereikbaar en daarna terug`() = runTest {
+    fun `1 - Frigate unreachable for 60 seconds and then back`() = runTest {
         val h = ManagerHarness(this, 4, 1)
         h.manager.start()
         advance(3_000)
@@ -31,21 +31,21 @@ class ScenarioTest {
             sawStates += st::class.simpleName!!
             h.assertInvariants()
             if (second >= 2) {
-                // Na detectie (fake: ~1,1 s) is er altijd een lopende poging of een ingeplande reconnect.
+                // After detection (fake: ~1.1 s) there is always an attempt in progress or a scheduled reconnect.
                 assertFalse(st is StreamState.Playing)
                 val connectingNow = st is StreamState.Connecting || (st is StreamState.Offline && st.connectingNow)
-                assertTrue("reconnect-logica blijft actief ($st)", h.ctrl(0).hasPendingReconnect || connectingNow)
+                assertTrue("reconnect logic stays active ($st)", h.ctrl(0).hasPendingReconnect || connectingNow)
             }
         }
-        assertTrue("kort: Reconnecting", "Reconnecting" in sawStates)
-        assertTrue("na 20 s: Offline", "Offline" in sawStates)
+        assertTrue("short: Reconnecting", "Reconnecting" in sawStates)
+        assertTrue("after 20 s: Offline", "Offline" in sawStates)
         assertTrue(h.state(0) is StreamState.Offline)
-        // Backoff binnen 60 s: ~1+2+4+8+16+30 -> hooguit 7 pogingen voor de actieve camera.
+        // Backoff within 60 s: ~1+2+4+8+16+30 -> at most 7 attempts for the active camera.
         val activeStarts = h.factory.created.filter { it.cameraId == "auto:cam0" }.sumOf { it.startCount }
-        assertTrue("aantal pogingen begrensd door backoff: $activeStarts", activeStarts in 5..9)
+        assertTrue("number of attempts bounded by backoff: $activeStarts", activeStarts in 5..9)
 
         h.server.up = true
-        advance(31_000) // langste backoff is 30 s
+        advance(31_000) // longest backoff is 30 s
         assertEquals(StreamState.Playing, h.state(0))
         advance(5_000)
         assertEquals(StreamState.Playing, h.state(1))
@@ -54,7 +54,7 @@ class ScenarioTest {
     }
 
     @Test
-    fun `2 - een camera valt weg en komt terug, de andere blijven werken`() = runTest {
+    fun `2 - one camera drops out and comes back, the others keep working`() = runTest {
         val h = ManagerHarness(this, 3, 2)
         h.manager.start()
         advance(3_000)
@@ -73,22 +73,22 @@ class ScenarioTest {
     }
 
     @Test
-    fun `3 - netwerk weg en terug, Frigate pas enkele seconden later bereikbaar`() = runTest {
+    fun `3 - network down and back, Frigate only reachable a few seconds later`() = runTest {
         val h = ManagerHarness(this, 3, 1)
         h.manager.start()
         advance(3_000)
-        // Wifi valt weg (ook Frigate is vanaf de tablet dus onbereikbaar).
+        // Wi-Fi drops (so Frigate is also unreachable from the tablet).
         h.server.up = false
         h.manager.onNetworkChanged(false)
         val startsBefore = h.factory.created.sumOf { it.startCount }
         advance(30_000)
-        assertEquals("geen pogingen zolang er geen netwerk is", startsBefore, h.factory.created.sumOf { it.startCount })
+        assertEquals("no attempts while there is no network", startsBefore, h.factory.created.sumOf { it.startCount })
         assertTrue(h.ctrl(0).status.value.waitingForNetwork)
         assertTrue(h.state(0) is StreamState.Offline)
 
-        // Netwerk terug, maar Frigate nog 5 s niet.
+        // Network back, but Frigate not for another 5 s.
         h.manager.onNetworkChanged(true)
-        assertTrue("direct opnieuw proberen", h.factory.created.sumOf { it.startCount } > startsBefore)
+        assertTrue("retry immediately", h.factory.created.sumOf { it.startCount } > startsBefore)
         advance(5_000)
         assertFalse(h.state(0) is StreamState.Playing)
         h.server.up = true
@@ -99,7 +99,7 @@ class ScenarioTest {
     }
 
     @Test
-    fun `4 - RTSP-verbinding blijft open terwijl de frames stoppen`() = runTest {
+    fun `4 - RTSP connection stays open while frames stop`() = runTest {
         val h = ManagerHarness(this, 3, 1)
         h.manager.start()
         advance(3_000)
@@ -107,7 +107,7 @@ class ScenarioTest {
         advance(6_000)
         assertEquals(1, h.log.count("watchdog_triggered", "cam0"))
         assertEquals(ErrorCategory.STALLED, h.ctrl(0).status.value.lastError)
-        assertEquals("buur heeft er geen last van", StreamState.Playing, h.state(1))
+        assertEquals("neighbour is not affected", StreamState.Playing, h.state(1))
         h.server.frozen.clear()
         advance(5_000)
         assertEquals(StreamState.Playing, h.state(0))
@@ -115,12 +115,12 @@ class ScenarioTest {
     }
 
     @Test
-    fun `5 - snel swipen met 12 camera's`() = runTest {
+    fun `5 - fast swiping with 12 cameras`() = runTest {
         val h = ManagerHarness(this, 12, 2)
         h.manager.start()
         advance(2_000)
         var index = 0
-        // 15 snelle swipes vooruit, dan 12 achteruit, met korte en zeer korte pauzes.
+        // 15 fast swipes forward, then 12 back, with short and very short pauses.
         val moves = List(15) { 1 } + List(12) { -1 }
         moves.forEachIndexed { i, step ->
             index += step
@@ -137,7 +137,7 @@ class ScenarioTest {
         assertTrue(h.manager.maxObservedPlayers <= 3)
         val active = h.manager.activeCamera()!!
         assertEquals(StreamState.Playing, h.manager.controller(active.id)!!.status.value.state)
-        // Geen enkele controller buiten het venster heeft nog timers of spelers.
+        // No controller outside the window still has timers or players.
         for (c in h.manager.controllerMap.value.values) {
             if (c.camera.id !in h.windowIds()) {
                 assertFalse(c.hasPlayer)
@@ -148,7 +148,7 @@ class ScenarioTest {
     }
 
     @Test
-    fun `6 - stream met niet-ondersteunde codec geeft geen eindeloze reconnect-loop`() = runTest {
+    fun `6 - stream with unsupported codec does not cause an endless reconnect loop`() = runTest {
         val h = ManagerHarness(this, 3, 1)
         h.server.failures["cam0"] = ErrorCategory.UNSUPPORTED_VIDEO_CODEC
         h.manager.start()
@@ -157,12 +157,12 @@ class ScenarioTest {
         assertTrue(st is StreamState.Error && st.category == ErrorCategory.UNSUPPORTED_VIDEO_CODEC)
         assertEquals(1, h.factory.created.filter { it.cameraId == "auto:cam0" }.sumOf { it.startCount })
         assertFalse(h.ctrl(0).hasPlayer)
-        assertEquals("buur speelt gewoon", StreamState.Playing, h.state(1))
-        // Andere camera's blijven gewoon bekijkbaar.
+        assertEquals("neighbour just plays", StreamState.Playing, h.state(1))
+        // Other cameras remain viewable.
         h.manager.setActiveIndex(1)
         advance(2_000)
         assertEquals(StreamState.Playing, h.state(1))
-        // Terugswipen naar de foute camera start geen nieuwe pogingen (fout blijft staan).
+        // Swiping back to the failed camera does not start new attempts (the error stays).
         h.manager.setActiveIndex(0)
         advance(60_000)
         assertEquals(1, h.factory.created.filter { it.cameraId == "auto:cam0" }.sumOf { it.startCount })
@@ -170,14 +170,14 @@ class ScenarioTest {
     }
 
     @Test
-    fun `7 - herhaaldelijk naar de achtergrond en terug`() = runTest {
+    fun `7 - repeatedly to the background and back`() = runTest {
         val h = ManagerHarness(this, 6, 2)
         h.manager.start()
         advance(3_000)
         repeat(25) { i ->
             h.manager.stop()
-            h.manager.stop() // dubbel aanroepen is onschadelijk
-            assertEquals("alles vrijgegeven op de achtergrond", 0, h.factory.live.size)
+            h.manager.stop() // calling twice is harmless
+            assertEquals("everything released in the background", 0, h.factory.live.size)
             assertTrue(h.manager.controllerMap.value.values.none { it.hasPendingReconnect })
             advance(if (i % 2 == 0) 50L else 2_000L)
             h.manager.start()
@@ -191,7 +191,7 @@ class ScenarioTest {
         assertEquals(StreamState.Playing, h.state(0))
         assertEquals(PlayerRole.ACTIVE, h.ctrl(0).role)
         h.assertInvariants()
-        // Per actieve camera precies één speler, en geen extra reconnects door het wisselen.
+        // Exactly one player per active camera, and no extra reconnects from switching.
         assertEquals(0, h.log.count("reconnect_scheduled"))
         h.manager.stop()
         assertEquals(0, h.factory.live.size)
@@ -199,13 +199,13 @@ class ScenarioTest {
     }
 
     @Test
-    fun `codecfout krijgt een nieuwe kans als de app terug naar de voorgrond komt`() = runTest {
+    fun `codec error gets another chance when the app returns to the foreground`() = runTest {
         val h = ManagerHarness(this, 2, 0)
         h.server.failures["cam0"] = ErrorCategory.UNSUPPORTED_VIDEO_CODEC
         h.manager.start()
         advance(2_000)
         assertTrue(h.ctrl(0).isError)
-        h.server.failures.clear() // bv. go2rtc transcodeert nu naar H.264
+        h.server.failures.clear() // e.g. go2rtc now transcodes to H.264
         h.manager.stop()
         h.manager.start()
         advance(2_000)

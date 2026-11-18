@@ -2,7 +2,7 @@ package io.github.rutgersmit.frigastreamer.domain
 
 import kotlinx.serialization.Serializable
 
-/** Handmatig toegevoegde camera. URL's mogen credentials bevatten (`rtsp://user:pass@...`). */
+/** Manually added camera. URLs may contain credentials (`rtsp://user:pass@...`). */
 @Serializable
 data class ManualCamera(
     val id: String,
@@ -11,12 +11,12 @@ data class ManualCamera(
     val subUrl: String? = null,
 )
 
-/** Gebruikersaanpassingen per camera-id (zowel automatisch als handmatig). */
+/** User overrides per camera id (both automatic and manual). */
 @Serializable
 data class CameraOverride(
     val hidden: Boolean = false,
     val preferSub: Boolean = false,
-    /** Alleen voor automatische camera's: overschrijf de afgeleide URL's. */
+    /** Automatic cameras only: override the derived URLs. */
     val mainUrl: String? = null,
     val subUrl: String? = null,
     val name: String? = null,
@@ -26,11 +26,11 @@ data class CameraOverride(
 data class CameraConfig(
     val manual: List<ManualCamera> = emptyList(),
     val overrides: Map<String, CameraOverride> = emptyMap(),
-    /** Gewenste volgorde (camera-id's). Onbekende id's worden genegeerd, nieuwe achteraan gezet. */
+    /** Desired order (camera ids). Unknown ids are ignored, new ones are appended. */
     val order: List<String> = emptyList(),
 )
 
-/** Camera plus de instellingen die het instellingenscherm nodig heeft. */
+/** Camera plus the settings the settings screen needs. */
 data class CameraEntry(val camera: Camera, val hidden: Boolean)
 
 data class RtspEndpoint(val host: String, val port: Int) {
@@ -50,7 +50,7 @@ data class RtspEndpoint(val host: String, val port: Int) {
 object CameraListBuilder {
     fun autoId(name: String) = "auto:$name"
 
-    /** Alle camera's (ook verborgen), in de gewenste volgorde. */
+    /** All cameras (including hidden ones), in the desired order. */
     fun build(auto: List<AutoCamera>, config: CameraConfig, endpoint: RtspEndpoint?): List<CameraEntry> {
         val entries = LinkedHashMap<String, CameraEntry>()
         if (endpoint != null) {
@@ -67,7 +67,7 @@ object CameraListBuilder {
                         subUrl = sub,
                         source = CameraSource.AUTO,
                         preferSub = o.preferSub,
-                        // Een handmatig overschreven URL kan eigen credentials bevatten.
+                        // A manually overridden URL may contain its own credentials.
                         useGlobalRtspAuth = o.mainUrl.isNullOrBlank(),
                     ),
                     hidden = o.hidden,

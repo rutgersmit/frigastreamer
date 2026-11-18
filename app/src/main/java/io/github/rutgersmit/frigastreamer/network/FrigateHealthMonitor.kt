@@ -24,9 +24,9 @@ data class FrigateHealth(
 )
 
 /**
- * Controleert periodiek of de Frigate-API en de RTSP-poort (go2rtc) bereikbaar zijn, zodat de UI
- * onderscheid kan maken tussen "Frigate onbereikbaar", "RTSP-server onbereikbaar" en "camera
- * onbereikbaar". Beïnvloedt de reconnect-logica van de streams niet.
+ * Periodically checks whether the Frigate API and the RTSP port (go2rtc) are reachable, so the UI
+ * can distinguish between "Frigate unreachable", "RTSP server unreachable" and "camera
+ * unreachable". Does not affect the reconnect logic of the streams.
  */
 class FrigateHealthMonitor(
     private val client: FrigateClient,

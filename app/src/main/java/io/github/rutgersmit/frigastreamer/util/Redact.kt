@@ -1,6 +1,6 @@
 package io.github.rutgersmit.frigastreamer.util
 
-/** Verwijdert credentials uit URL's en willekeurige tekst voordat die gelogd of getoond wordt. */
+/** Removes credentials from URLs and arbitrary text before it is logged or shown. */
 object Redact {
     private val userInfo = Regex("""([a-zA-Z][a-zA-Z0-9+.-]*://)[^/@\s]*@""")
     private val tokenParam = Regex("""(?i)((?:token|password|pass|pwd|auth|key)=)[^&\s;]+""")

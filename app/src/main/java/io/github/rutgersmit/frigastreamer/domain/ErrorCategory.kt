@@ -1,24 +1,27 @@
 package io.github.rutgersmit.frigastreamer.domain
 
 /**
- * Foutcategorieën. [permanent] fouten leiden NIET tot automatische reconnects
- * (geen eindeloze loop); de gebruiker kan handmatig opnieuw proberen.
+ * Error categories. [permanent] errors do NOT trigger automatic reconnects
+ * (no endless loop); the user can retry manually.
+ *
+ * [description] is an English, non-localized description for logs and the debug overlay.
+ * The UI shows a localized label via `ui/ErrorLabels.kt`.
  */
-enum class ErrorCategory(val permanent: Boolean, val label: String) {
-    NETWORK(false, "Netwerkfout"),
-    NETWORK_UNAVAILABLE(false, "Geen netwerkverbinding"),
-    CONNECT_TIMEOUT(false, "Verbinding maken duurt te lang"),
-    RTSP_PROTOCOL(false, "RTSP-protocolfout"),
-    RTSP_NOT_FOUND(false, "Stream niet gevonden op de RTSP-server"),
-    RTSP_AUTH(true, "RTSP-authenticatie mislukt"),
-    STREAM_ENDED(false, "Stream beëindigd door de server"),
-    STALLED(false, "Verbinding open, maar geen nieuwe beelden"),
-    UNSUPPORTED_VIDEO_CODEC(true, "Videocodec niet ondersteund door dit apparaat"),
-    UNSUPPORTED_AUDIO_CODEC(false, "Audiocodec niet ondersteund"),
-    DECODER_INIT(false, "Videodecoder kon niet starten"),
-    DECODING(false, "Decoderfout"),
-    CODEC_PERMANENT(true, "Stream kan niet gedecodeerd worden"),
-    UNKNOWN(false, "Onbekende streamfout"),
+enum class ErrorCategory(val permanent: Boolean, val description: String) {
+    NETWORK(false, "Network error"),
+    NETWORK_UNAVAILABLE(false, "No network connection"),
+    CONNECT_TIMEOUT(false, "Connecting takes too long"),
+    RTSP_PROTOCOL(false, "RTSP protocol error"),
+    RTSP_NOT_FOUND(false, "Stream not found on the RTSP server"),
+    RTSP_AUTH(true, "RTSP authentication failed"),
+    STREAM_ENDED(false, "Stream ended by the server"),
+    STALLED(false, "Connection open, but no new frames"),
+    UNSUPPORTED_VIDEO_CODEC(true, "Video codec not supported by this device"),
+    UNSUPPORTED_AUDIO_CODEC(false, "Audio codec not supported"),
+    DECODER_INIT(false, "Video decoder could not start"),
+    DECODING(false, "Decoder error"),
+    CODEC_PERMANENT(true, "Stream cannot be decoded"),
+    UNKNOWN(false, "Unknown stream error"),
     ;
 
     val isCodecRelated: Boolean
@@ -29,19 +32,19 @@ enum class ErrorCategory(val permanent: Boolean, val label: String) {
 enum class TrackKind { VIDEO, AUDIO, OTHER }
 
 /**
- * Neutrale beschrijving van een spelerfout, los van Media3, zodat classificatie
- * zonder Android/ExoPlayer te testen is.
+ * Neutral description of a player failure, independent of Media3, so classification
+ * can be tested without Android/ExoPlayer.
  */
 data class FailureInfo(
     /** Media3 PlaybackException.errorCode. */
     val errorCode: Int,
-    /** Track/renderer waar de fout optrad, als bekend. */
+    /** Track/renderer where the failure occurred, if known. */
     val trackKind: TrackKind? = null,
-    /** Berichten en klassennamen uit de exception-keten (al geredacteerd). */
+    /** Messages and class names from the exception chain (already redacted). */
     val messages: List<String> = emptyList(),
 )
 
-/** Spiegelt de relevante Media3 `PlaybackException.ERROR_CODE_*`-constanten (geverifieerd in een unit test). */
+/** Mirrors the relevant Media3 `PlaybackException.ERROR_CODE_*` constants (verified in a unit test). */
 object PlaybackErrorCodes {
     const val UNSPECIFIED = 1000
     const val REMOTE_ERROR = 1001

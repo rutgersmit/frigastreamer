@@ -6,16 +6,16 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// ---- Versiebeheer -------------------------------------------------------------------------
-// versionCode = GITHUB_RUN_NUMBER in CI (lokaal 1), zodat elke CI-build hoger is dan de vorige.
-// versionName = APP_VERSION_NAME (door de workflow gezet: tag zonder 'v', of 0.0.0-dev.<run>).
+// ---- Versioning ---------------------------------------------------------------------------
+// versionCode = GITHUB_RUN_NUMBER in CI (1 locally), so every CI build is higher than the previous one.
+// versionName = APP_VERSION_NAME (set by the workflow: tag without 'v', or 0.0.0-dev.<run>).
 val ciRunNumber: Int = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 val appVersionName: String = System.getenv("APP_VERSION_NAME")?.takeIf { it.isNotBlank() }
     ?: "0.0.0-dev.local"
 
 // ---- Signing ------------------------------------------------------------------------------
-// De release-build wordt ALLEEN ondertekend met de vaste keystore uit de environment.
-// Ontbreekt die, dan faalt de release-build expliciet (geen stille terugval op debug-signing).
+// The release build is ONLY signed with the fixed keystore from the environment.
+// If it is missing, the release build fails explicitly (no silent fallback to debug signing).
 val keystorePath: String? = System.getenv("SIGNING_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
 val hasReleaseSigning: Boolean = keystorePath != null &&
     file(keystorePath).exists() &&
@@ -48,8 +48,8 @@ android {
 
     buildTypes {
         release {
-            // R8 is bewust uit: Media3/RTSP gebruikt reflectie-loze maar uitgebreide code en
-            // voor een LAN-app op één tablet weegt de kleinere APK niet op tegen het risico.
+            // R8 is deliberately off: Media3/RTSP is reflection-free but extensive code, and for
+            // a LAN app on a single tablet a smaller APK is not worth the risk.
             isMinifyEnabled = false
             isShrinkResources = false
             if (hasReleaseSigning) {
@@ -93,15 +93,15 @@ kotlin {
     }
 }
 
-// Faal hard en duidelijk als iemand een release bouwt zonder signing-secrets.
+// Fail hard and clearly when someone builds a release without signing secrets.
 val verifyReleaseSigning = tasks.register("verifyReleaseSigning") {
     doLast {
         if (!hasReleaseSigning) {
             throw GradleException(
-                "Release-signing ontbreekt. Zet SIGNING_KEYSTORE_PATH, SIGNING_STORE_PASSWORD, " +
-                    "SIGNING_KEY_ALIAS en SIGNING_KEY_PASSWORD (in CI via de GitHub Secrets " +
+                "Release signing is missing. Set SIGNING_KEYSTORE_PATH, SIGNING_STORE_PASSWORD, " +
+                    "SIGNING_KEY_ALIAS and SIGNING_KEY_PASSWORD (in CI via the GitHub Secrets " +
                     "SIGNING_KEYSTORE_BASE64, SIGNING_STORE_PASSWORD, SIGNING_KEY_ALIAS, SIGNING_KEY_PASSWORD). " +
-                    "Er wordt bewust niet teruggevallen op debug-signing."
+                    "There is deliberately no fallback to debug signing."
             )
         }
     }

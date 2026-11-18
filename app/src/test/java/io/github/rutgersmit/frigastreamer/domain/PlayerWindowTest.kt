@@ -8,7 +8,7 @@ class PlayerWindowTest {
     private fun ids(slots: List<WindowSlot>) = slots.map { it.cameraIndex }
 
     @Test
-    fun `een camera geeft altijd precies een speler`() {
+    fun `one camera always gives exactly one player`() {
         for (p in 0..2) {
             val w = PlayerWindow.compute(1, 0, p)
             assertEquals(listOf(WindowSlot(0, PlayerRole.ACTIVE)), w)
@@ -16,7 +16,7 @@ class PlayerWindowTest {
     }
 
     @Test
-    fun `twee camera's geven nooit twee spelers voor dezelfde camera`() {
+    fun `two cameras never give two players for the same camera`() {
         for (active in 0..1) for (p in 0..2) {
             val w = PlayerWindow.compute(2, active, p)
             assertEquals(ids(w).toSet().size, w.size)
@@ -26,21 +26,21 @@ class PlayerWindowTest {
     }
 
     @Test
-    fun `preload 1 is de volgende camera, preload 2 ook de vorige`() {
+    fun `preload 1 is the next camera, preload 2 also the previous one`() {
         assertEquals(listOf(5), ids(PlayerWindow.compute(10, 5, 0)))
         assertEquals(listOf(5, 6), ids(PlayerWindow.compute(10, 5, 1)))
         assertEquals(listOf(5, 6, 4), ids(PlayerWindow.compute(10, 5, 2)))
     }
 
     @Test
-    fun `wrap-around aan beide randen`() {
+    fun `wrap-around at both edges`() {
         assertEquals(listOf(0, 1, 9), ids(PlayerWindow.compute(10, 0, 2)))
         assertEquals(listOf(9, 0, 8), ids(PlayerWindow.compute(10, 9, 2)))
         assertEquals(listOf(9, 0), ids(PlayerWindow.compute(10, -1, 1)))
     }
 
     @Test
-    fun `nooit meer dan drie spelers en geen duplicaten`() {
+    fun `never more than three players and no duplicates`() {
         for (n in 1..15) for (a in -20..20) for (p in -1..5) {
             val w = PlayerWindow.compute(n, a, p)
             assertTrue(w.size <= PlayerWindow.MAX_PLAYERS)
@@ -52,7 +52,7 @@ class PlayerWindowTest {
     }
 
     @Test
-    fun `pagina naar camera-index met wrap-around`() {
+    fun `page to camera index with wrap-around`() {
         assertEquals(0, PlayerWindow.cameraIndexForPage(0, 3))
         assertEquals(2, PlayerWindow.cameraIndexForPage(-1, 3))
         assertEquals(1, PlayerWindow.cameraIndexForPage(1_000_000, 3))
@@ -63,7 +63,7 @@ class PlayerWindowTest {
                 val start = PlayerWindow.initialPage(n, idx)
                 assertEquals(idx, PlayerWindow.cameraIndexForPage(start, n))
                 assertTrue(start in 0 until maxOf(total, 1))
-                // Vanaf de startpagina kan in beide richtingen ruim geswipet worden.
+                // From the start page there is plenty of room to swipe in both directions.
                 if (n > 1) assertTrue(start > 1000 && total - start > 1000)
             }
         }
@@ -71,10 +71,10 @@ class PlayerWindowTest {
     }
 
     @Test
-    fun `speler wordt aan precies een pagina gekoppeld, ook bij 2 camera's`() {
+    fun `player is bound to exactly one page, also with 2 cameras`() {
         for (n in 1..6) {
             val current = PlayerWindow.initialPage(n, 0)
-            // Alle pagina's die tegelijk gecomposed kunnen zijn (huidige +-1).
+            // All pages that can be composed at the same time (current +-1).
             val pages = (current - 1)..(current + 1)
             for (idx in 0 until n) {
                 val bound = PlayerWindow.boundPageFor(idx, current, n)
@@ -83,7 +83,7 @@ class PlayerWindowTest {
                 assertTrue(candidates.count { it == bound } <= 1)
             }
         }
-        // 2 camera's: links en rechts staat dezelfde camera; alleen rechts krijgt de speler.
+        // 2 cameras: the same camera is on the left and on the right; only the right one gets the player.
         val cur = PlayerWindow.initialPage(2, 0)
         assertEquals(cur + 1, PlayerWindow.boundPageFor(1, cur, 2))
         assertEquals(cur, PlayerWindow.boundPageFor(0, cur, 2))

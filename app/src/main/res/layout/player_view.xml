@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- TextureView i.p.v. SurfaceView: werkt betrouwbaar in een swipende HorizontalPager.
-     keep_content_on_player_reset: het laatste beeld blijft staan tijdens reconnects. -->
+<!-- TextureView instead of SurfaceView: works reliably in a swiping HorizontalPager.
+     keep_content_on_player_reset: the last frame stays visible during reconnects. -->
 <androidx.media3.ui.PlayerView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"

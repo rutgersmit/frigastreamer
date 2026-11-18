@@ -1,10 +1,10 @@
 package io.github.rutgersmit.frigastreamer.util
 
 /**
- * Gestructureerde logging. Elke regel heeft de vorm `event=<naam> key=value ...`.
+ * Structured logging. Every line has the form `event=<name> key=value ...`.
  * Tags: `FS.Cam.<camera>`, `FS.Manager`, `FS.Net`, `FS.Api`, `FS.Health`.
  *
- * Log NOOIT wachtwoorden, tokens of URL's met credentials: gebruik [Redact.url].
+ * NEVER log passwords, tokens or URLs with credentials: use [Redact.url].
  */
 interface Logger {
     fun d(tag: String, msg: String)
@@ -18,7 +18,7 @@ interface Logger {
     }
 }
 
-/** Implementatie op basis van android.util.Log (bruikbaar via `adb logcat`). */
+/** Implementation based on android.util.Log (usable via `adb logcat`). */
 object AndroidLogger : Logger {
     override fun d(tag: String, msg: String) { android.util.Log.d(tag, msg) }
     override fun i(tag: String, msg: String) { android.util.Log.i(tag, msg) }

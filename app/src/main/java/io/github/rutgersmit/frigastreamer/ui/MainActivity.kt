@@ -29,12 +29,12 @@ import io.github.rutgersmit.frigastreamer.ui.settings.SettingsScreen
 import io.github.rutgersmit.frigastreamer.util.AndroidLogger
 
 /**
- * Enige Activity. Lifecycle:
- * - ON_START  → streams starten (laatst geselecteerde camera + preload-venster).
- * - ON_STOP   → alle spelers en RTSP-verbindingen vrijgeven (scherm uit, andere app, standby).
- * ON_PAUSE/ON_RESUME worden bewust niet gebruikt om te stoppen: in multi-window/split-screen is de
- * app gepauzeerd maar zichtbaar en moet de stream doorlopen. start()/stop() zijn idempotent, dus
- * herhaald wisselen tussen voor- en achtergrond levert nooit dubbele spelers of reconnects op.
+ * The only Activity. Lifecycle:
+ * - ON_START  → start streams (last selected camera + preload window).
+ * - ON_STOP   → release all players and RTSP connections (screen off, other app, standby).
+ * ON_PAUSE/ON_RESUME are deliberately not used to stop: in multi-window/split-screen the app is
+ * paused but visible and the stream must keep running. start()/stop() are idempotent, so
+ * repeatedly switching between foreground and background never causes duplicate players or reconnects.
  */
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()

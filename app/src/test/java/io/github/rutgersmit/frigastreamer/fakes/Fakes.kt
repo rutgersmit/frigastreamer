@@ -14,7 +14,7 @@ import io.github.rutgersmit.frigastreamer.player.TrackInfo
 import io.github.rutgersmit.frigastreamer.util.Clock
 import io.github.rutgersmit.frigastreamer.util.Logger
 
-/** Klok op basis van de virtuele tijd van kotlinx-coroutines-test. */
+/** Clock based on the virtual time of kotlinx-coroutines-test. */
 class FakeClock(private val scheduler: TestCoroutineScheduler) : Clock {
     override fun elapsedMs(): Long = scheduler.currentTime
     override fun wallMs(): Long = 1_700_000_000_000L + scheduler.currentTime
@@ -36,24 +36,24 @@ class RecordingLogger(private val echo: Boolean = false) : Logger {
 }
 
 /**
- * Gesimuleerde Frigate/go2rtc-server. Streams worden geïdentificeerd door het laatste
- * pad-segment van de URL (bv. `rtsp://x:8554/cam3_sub` → `cam3_sub`).
+ * Simulated Frigate/go2rtc server. Streams are identified by the last path segment
+ * of the URL (e.g. `rtsp://x:8554/cam3_sub` → `cam3_sub`).
  */
 class FakeServer {
-    /** Frigate/go2rtc als geheel bereikbaar. */
+    /** Frigate/go2rtc reachable as a whole. */
     var up = true
-    /** Individuele streams die niet reageren (camera offline). */
+    /** Individual streams that do not respond (camera offline). */
     val down = mutableSetOf<String>()
-    /** Streams waarvan de verbinding open blijft maar de frames stoppen. */
+    /** Streams whose connection stays open but frames stop. */
     val frozen = mutableSetOf<String>()
-    /** Streams die altijd met deze fout falen (bv. niet-ondersteunde codec). */
+    /** Streams that always fail with this error (e.g. unsupported codec). */
     val failures = mutableMapOf<String, ErrorCategory>()
-    /** Tijd tot het eerste frame (bv. hoog bij een keyframe-interval van 10 s). */
+    /** Time until the first frame (e.g. high with a 10 s keyframe interval). */
     var connectDelayMs = 300L
     val connectDelayFor = mutableMapOf<String, Long>()
-    /** Maximaal aantal gelijktijdige decoders op het "apparaat". */
+    /** Maximum number of simultaneous decoders on the "device". */
     var maxDecoders = Int.MAX_VALUE
-    /** Na een serverstoring merkt de speler het verbreken pas na zoveel ms (RTSP-timeout). */
+    /** After a server outage the player only notices the disconnect after this many ms (RTSP timeout). */
     var dropDetectMs = 1_000L
 
     fun name(url: String) = url.substringAfterLast('/')
@@ -109,7 +109,7 @@ class FakeStreamPlayer(
     }
 
     override fun start(source: StreamSource) {
-        check(!released) { "start na release" }
+        check(!released) { "start after release" }
         stop()
         startCount++
         this.source = source
@@ -124,21 +124,21 @@ class FakeStreamPlayer(
                 }
                 failure != null -> {
                     if (failure == ErrorCategory.UNSUPPORTED_AUDIO_CODEC && source.audioDisabled) {
-                        // zonder audio speelt de stream wel
+                        // without audio the stream does play
                     } else {
                         listener?.onFailure(PlayerFailure(failure, "fake $failure"))
                         return@launch
                     }
                 }
                 factory.decodingCount() >= server.maxDecoders -> {
-                    listener?.onFailure(PlayerFailure(ErrorCategory.DECODER_INIT, "fake: geen decoder vrij"))
+                    listener?.onFailure(PlayerFailure(ErrorCategory.DECODER_INIT, "fake: no decoder available"))
                     return@launch
                 }
             }
             decoding = true
             listener?.onTracks(TrackInfo("video/avc", 1920, 1080, "audio/mp4a-latm", true))
             listener?.onFirstFrame()
-            // Server valt weg tijdens afspelen: na dropDetectMs meldt de speler een netwerkfout.
+            // Server drops out during playback: after dropDetectMs the player reports a network error.
             while (decoding) {
                 delay(100)
                 if (!server.reachable(name)) {
@@ -160,7 +160,7 @@ class FakeStreamPlayer(
         this.muted = muted
     }
 
-    /** Loopt op bij elke uitlezing zolang er "frames binnenkomen". */
+    /** Increases on every read while "frames are arriving". */
     override fun frameCounter(): Long {
         val name = streamName
         if (decoding && name != null && name !in server.frozen && server.reachable(name)) frames++
