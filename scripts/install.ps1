@@ -7,8 +7,8 @@ param(
     [string]$Repo = $env:REPO
 )
 $ErrorActionPreference = "Stop"
-$Package = "nl.frigastreamer"
-$Activity = "nl.frigastreamer/.ui.MainActivity"
+$Package = "io.github.rutgersmit.frigastreamer"
+$Activity = "io.github.rutgersmit.frigastreamer/.ui.MainActivity"
 
 function Fail($msg) { Write-Host "FOUT: $msg" -ForegroundColor Red; exit 1 }
 

@@ -7,8 +7,8 @@
 #   REPO=eigenaar/repo ./scripts/install.sh
 set -euo pipefail
 
-PACKAGE="nl.frigastreamer"
-ACTIVITY="nl.frigastreamer/.ui.MainActivity"
+PACKAGE="io.github.rutgersmit.frigastreamer"
+ACTIVITY="io.github.rutgersmit.frigastreamer/.ui.MainActivity"
 TAG="${1:-}"
 
 fail() { echo "FOUT: $*" >&2; exit 1; }

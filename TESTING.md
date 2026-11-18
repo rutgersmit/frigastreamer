@@ -113,7 +113,7 @@ camera. logcat: `FS.App event=app_start`, `ON_START`. Terugzetten: zelfde knop â
 2. Meet aan het begin, na 1 uur en aan het eind:
 
    ```bash
-   adb shell dumpsys meminfo nl.frigastreamer | grep -E "TOTAL PSS|TOTAL RSS|Native Heap|Java Heap|Views:|Activities:"
+   adb shell dumpsys meminfo io.github.rutgersmit.frigastreamer | grep -E "TOTAL PSS|TOTAL RSS|Native Heap|Java Heap|Views:|Activities:"
    ```
 
 Verwacht: na de opwarmfase geen gestage groei van *TOTAL PSS* / *Native Heap* (enkele MB schommeling is

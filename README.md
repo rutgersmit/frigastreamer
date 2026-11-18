@@ -41,7 +41,7 @@ streams, Frigate-herstarts en standby. Betrouwbaarheid gaat vóór extra functio
 
 ```
 .github/workflows/build.yml   CI: unit tests, (ondertekende) build, artifact, release bij tag v*
-app/src/main/java/nl/frigastreamer/
+app/src/main/java/io/github/rutgersmit/frigastreamer/
   data/        Frigate-API-client (login/JWT), JSON-parsing, CameraRepository (cache)
   domain/      Modellen en pure logica: backoff, spelervenster, foutclassificatie,
                stream↔camera-koppeling, cameralijst samenstellen
@@ -217,7 +217,7 @@ powershell -ExecutionPolicy Bypass -File scripts\install.ps1
 
 De scripts controleren `gh` en `adb`, downloaden de APK met `gh release download`, installeren met
 `adb install -r` op alle verbonden apparaten, starten de app en geven duidelijke foutmeldingen
-(o.a. bij `INSTALL_FAILED_UPDATE_INCOMPATIBLE`: andere sleutel → eerst `adb uninstall nl.frigastreamer`).
+(o.a. bij `INSTALL_FAILED_UPDATE_INCOMPATIBLE`: andere sleutel → eerst `adb uninstall io.github.rutgersmit.frigastreamer`).
 
 **USB:** zet op de tablet *Ontwikkelaarsopties → USB-foutopsporing* aan (ontwikkelaarsopties
 ontgrendel je door 7× op *Buildnummer* te tikken) en bevestig de vraag op het scherm.
@@ -245,7 +245,7 @@ export ANDROID_HOME=/pad/naar/android-sdk
 ./gradlew testDebugUnitTest assembleDebug
 ```
 
-De debug-APK (`app/build/outputs/apk/debug/app-debug.apk`) heeft package `nl.frigastreamer.debug`
+De debug-APK (`app/build/outputs/apk/debug/app-debug.apk`) heeft package `io.github.rutgersmit.frigastreamer.debug`
 en kan naast de release-versie bestaan. Een release-build lokaal vereist de signing-variabelen
 `SIGNING_KEYSTORE_PATH`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS` en `SIGNING_KEY_PASSWORD`.
 
@@ -434,7 +434,7 @@ home-app; na een reboot (of bij de home-knop) start Android hem dan altijd autom
 Via ADB:
 
 ```bash
-adb shell cmd package set-home-activity nl.frigastreamer/.ui.MainActivity
+adb shell cmd package set-home-activity io.github.rutgersmit.frigastreamer/.ui.MainActivity
 ```
 
 **Terugdraaien:** dezelfde knop in de app-instellingen, of in Android *Startscherm-app* een andere
@@ -449,7 +449,7 @@ adb shell cmd package set-home-activity com.google.android.apps.nexuslauncher/.N
 ```
 
 Kom je niet meer uit de app (instellingen bereik je altijd via lang indrukken of het tandwiel), dan
-werkt bovenstaande ADB-opdracht ook, of verwijder de app met `adb uninstall nl.frigastreamer`.
+werkt bovenstaande ADB-opdracht ook, of verwijder de app met `adb uninstall io.github.rutgersmit.frigastreamer`.
 
 **Waarom geen `BOOT_COMPLETED`-receiver?** Die zou alleen werken met de speciale permissie
 `SYSTEM_ALERT_WINDOW` (via ADB toe te kennen), en het gedrag verschilt per fabrikant/Android-versie.
@@ -501,7 +501,7 @@ adb logcat -v time '*:S' FS.Manager:V FS.Net:V 'FS.Cam.voordeur:V'
 adb logcat -v time | grep -E "watchdog_triggered|reconnect_scheduled|codec_error|player_(created|released)"
 ```
 
-Geheugen controleren: `adb shell dumpsys meminfo nl.frigastreamer`.
+Geheugen controleren: `adb shell dumpsys meminfo io.github.rutgersmit.frigastreamer`.
 
 ## Testomgeving (`testenv/`) en storingen simuleren
 
@@ -592,7 +592,7 @@ Wifi-onderbrekingen simuleer je op de tablet zelf (wifi uit/aan).
 | Geen geluid | Ontmuten? Bij *audiocodec niet ondersteund*: `#audio=aac` in go2rtc. |
 | Actieve camera start niet, buren wel | Decoderlimiet: zet het preload-venster op 0 of 1, of gebruik substreams. Debug-overlay toont *AUTO VERKLEIND*. |
 | Inloggen mislukt (8971) | Controleer gebruiker/wachtwoord en de HTTPS-instelling. |
-| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | De geïnstalleerde app is met een andere sleutel ondertekend: eenmalig `adb uninstall nl.frigastreamer`. |
+| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | De geïnstalleerde app is met een andere sleutel ondertekend: eenmalig `adb uninstall io.github.rutgersmit.frigastreamer`. |
 | Release-workflow faalt met *signing ontbreekt* | Zet de vier GitHub Secrets (zie [Eenmalige setup](#eenmalige-setup-keystore--github-secrets)). |
 | Obtainium vindt geen release | Token met *Contents: Read-only* op deze repository ingevuld? Bestaat er een release (niet alleen een tag)? |
 
