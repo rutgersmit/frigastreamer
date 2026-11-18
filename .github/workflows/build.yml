@@ -1,0 +1,158 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # nodig voor het aanmaken van een GitHub Release bij een tag
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: JDK 21 (Temurin)
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - name: Versie bepalen
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" == v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.0.0-dev.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "APP_VERSION_NAME=${VERSION}" >> "$GITHUB_ENV"
+          echo "versionName=${VERSION}, versionCode=${GITHUB_RUN_NUMBER}"
+
+      # De Android SDK staat al op ubuntu-latest; de Android Gradle Plugin downloadt zelf een
+      # ontbrekend platform (compileSdk) omdat de licenties op de runner al geaccepteerd zijn.
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Testsamenvatting
+        if: always()
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import glob, xml.etree.ElementTree as ET
+          total = failed = skipped = 0
+          rows = []
+          for f in sorted(glob.glob('app/build/test-results/testDebugUnitTest/*.xml')):
+              s = ET.parse(f).getroot()
+              t, fl, sk = int(s.get('tests')), int(s.get('failures')) + int(s.get('errors')), int(s.get('skipped'))
+              total += t; failed += fl; skipped += sk
+              rows.append(f"| {s.get('name').split('.')[-1]} | {t} | {fl} | {sk} |")
+          print("## Unit tests\n")
+          print(f"**{total} tests, {failed} gefaald, {skipped} overgeslagen**\n")
+          print("| Testklasse | Tests | Gefaald | Overgeslagen |\n|---|---|---|---|")
+          print("\n".join(rows))
+          EOF
+
+      - name: Testresultaten uploaden
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results
+          path: |
+            app/build/test-results/testDebugUnitTest/
+            app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: warn
+
+      - name: Signing-secrets controleren
+        id: signing
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          missing=()
+          [[ -z "$SIGNING_KEYSTORE_BASE64" ]] && missing+=(SIGNING_KEYSTORE_BASE64)
+          [[ -z "$SIGNING_STORE_PASSWORD" ]] && missing+=(SIGNING_STORE_PASSWORD)
+          [[ -z "$SIGNING_KEY_ALIAS" ]] && missing+=(SIGNING_KEY_ALIAS)
+          [[ -z "$SIGNING_KEY_PASSWORD" ]] && missing+=(SIGNING_KEY_PASSWORD)
+          if (( ${#missing[@]} > 0 )); then
+            msg="Release-signing niet mogelijk: GitHub Secret(s) ontbreken: ${missing[*]}. Zie README > Eenmalige setup."
+            if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+              echo "::error::$msg Een release wordt nooit met een debug-sleutel ondertekend."
+              exit 1
+            fi
+            echo "::warning::$msg Alleen unit tests en een debug-build worden uitgevoerd."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          echo "available=true" >> "$GITHUB_OUTPUT"
+
+      - name: Release-build (ondertekend)
+        if: steps.signing.outputs.available == 'true'
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Debug-build (geen signing-secrets beschikbaar)
+        if: steps.signing.outputs.available != 'true'
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: APK klaarzetten en handtekening controleren
+        id: apk
+        run: |
+          mkdir -p dist
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          if [[ "${{ steps.signing.outputs.available }}" == "true" ]]; then
+            SRC=app/build/outputs/apk/release/app-release.apk
+            OUT="dist/frigate-viewer-${APP_VERSION_NAME}.apk"
+          else
+            SRC=app/build/outputs/apk/debug/app-debug.apk
+            OUT="dist/frigate-viewer-${APP_VERSION_NAME}-debug.apk"
+          fi
+          cp "$SRC" "$OUT"
+          "$BT/apksigner" verify --print-certs "$OUT" | grep -E "Signer #1 certificate (DN|SHA-256)" || true
+          "$BT/aapt2" dump badging "$OUT" | head -1
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+          rm -f "$RUNNER_TEMP/release.keystore"
+
+      - name: APK uploaden als workflow-artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: apk-${{ env.APP_VERSION_NAME }}
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+
+      - name: GitHub Release aanmaken (alleen bij tag v*)
+        if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK="${{ steps.apk.outputs.path }}"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            # Opnieuw gedraaide workflow: asset vervangen, zodat er precies één APK blijft.
+            gh release upload "$GITHUB_REF_NAME" "$APK" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$APK" \
+              --title "FrigaStreamer ${APP_VERSION_NAME}" \
+              --generate-notes \
+              --verify-tag
+          fi
